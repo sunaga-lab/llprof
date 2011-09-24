@@ -34,6 +34,16 @@ td{
     border-right: none;
 }
 
+#sidepanel td{
+    font-size: 14px;
+    cursor: pointer;
+}
+
+#sidepanel td:hover{
+    color: red;
+}
+
+
 #mainpanel{
     width: auto;
 }

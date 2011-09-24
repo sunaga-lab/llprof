@@ -1,11 +1,11 @@
 
 g_current_target = null;
 g_active_panel = null;
-g_default_panel = "cct";
+g_default_panel = null;
 g_target_cct = null;
 g_now_info = {};
 g_metadata = {};
-g_target_pv_index = 2;
+g_target_pv_index = 0;
 
 var THREAD_NODE_ID = 0;
 var ROOT_NODE_ID = 1;
@@ -137,6 +137,8 @@ function update_ui_target_list(data)
     {
         count_update_counter();
     }
+    hide_pending();
+
 }
 
 function accumurate(dest, src, thread)
@@ -201,7 +203,7 @@ function update_ui_cct(data)
     if(g_timenav.real_time)
     {
         g_timenav.max_time = data.timenum;
-        $('#timebar').slider("option", "max", g_timenav.max_time);
+        update_time_nav({"max": g_timenav.max_time});
     }
     else
     {
@@ -301,11 +303,13 @@ function update_ui_cct(data)
 
 function show_target(id)
 {
+    show_pending();
     g_target_cct = null;
     g_current_target = id;
     g_timenav.max_time = 0;
     update_nav();
     fit_panel();
+
 }
 
 
@@ -358,545 +362,14 @@ function get_profile_value_self(thread, node, index)
 
 Panels = {};
 
-Panels.cct = {
+function add_panel(panel_name, paneldata)
+{
+    Panels[panel_name] = paneldata;
+    if(!g_default_panel)
+        g_default_panel = panel_name;
     
-    init: function()
-    {
-        if(!this.open_nodes)
-            this.open_nodes = {};
-    },
-    tree_reload: function()
-    {
-        $("#mainpanel").html("<div id='cct_outer'><div id='cct_inner'></div></div>");
-        this.cct_dict = {};
-        for(var thread_id in g_target_cct)
-        {
-            var thread_elem = Panels.cct.get_thread_elem(thread_id);
-            for(var key in g_target_cct[thread_id].nodes)
-            {
-                var node = g_target_cct[thread_id].nodes[key];
-                var node_elem = Panels.cct.get_node_elem(thread_id, node.id, true, node.pid);
-                Panels.cct.update_label(node_elem);
-            }
-        }
-        this.last_opened = null;
-        this.update_size();
-    },
+}
 
-    get_thread_elem: function(thread_id)
-    {
-        var thread_elem = $("#th_" + thread_id);
-        if(thread_elem.length == 0)
-        {
-            $("#cct_inner").append("<div class='treenode' id='th_" + thread_id + "'><div class='nodelabel'></div><div class='children'></div></div>");
-            thread_elem = $("#th_" + thread_id);
-            thread_elem.attr("threadid", thread_id);
-        }
-        thread_elem.children(".nodelabel").html("Thread: " + thread_id);
-        return thread_elem;
-    },
-    
-    get_node_elem: function(thread_id, node_id, auto_add, parent_node_id)
-    {
-        var node_elem_id = "node_th_" + thread_id + "_" + node_id;
-        
-        if(node_elem_id in this.cct_dict)
-        {
-            return $("#" + node_elem_id);
-        }
-        if(auto_add)
-        {
-            var parent_elem;
-            if(parent_node_id == THREAD_NODE_ID)
-            {
-                parent_elem = Panels.cct.get_thread_elem(thread_id);
-                if(parent_elem.children(".children").length == 0)
-                    return null;
-            }
-            else
-            {
-                var pnode_elem_id = "#node_th_" + thread_id + "_" + parent_node_id;
-                if(!(pnode_elem_id in this.cct_dict) || this.cct_dict[pnode_elem_id] != 2)
-                    return null;
-                
-                parent_elem = $(pnode_elem_id);
-            }
-            node_elem = Panels.cct.add_node(parent_elem, thread_id, node_id);
-            return node_elem;
-        }
-        else
-            return null;
-    },
-    
-    update_thread_label: function(thread_elem)
-    {
-        if(!thread_elem || thread_elem.length == 0)
-            return;
-        var thread = g_target_cct[thread_elem.attr('threadid')];
-        thread_elem.children(".nodelabel").html("Thread: " + thread.id); 
-            // + " Running:" + thread.running_node + " NowValue:" + thread.now_values.join(', '));
-    },
-    
-    update_label: function(node_elem)
-    {
-        if(!node_elem || node_elem.length == 0)
-            return;
-        var thread = g_target_cct[node_elem.attr('threadid')];
-        var node = thread.nodes[node_elem.attr('nodeid')];
-        
-        // todo: adhoc
-        var sval;
-        if(g_target_pv_index == 0)
-            sval = get_profile_value_all(thread, node, 0) / (1000 * 1000 * 1000);
-        else
-            sval = get_profile_value_all(thread, node, g_target_pv_index);
-        node_elem.children(".nodelabel").html(
-            "<img src='/files/"+(node.running?"running":"normal")+".png' />"
-             + node.id + ":" + html_esc(node.name) + " " + sval);
-        
-        // node_elem.children(".nodelabel").html("Node:" + html_esc(node.name) + " v: " + node.all + ";  " + node.cld);
-    },
-
-    update_size: function()
-    {
-        $("#cct_outer")
-            .width($("#mainpanel").width()-4)
-            .height($("#mainpanel").height()-4);
-    },
-
-    update: function(updated)
-    {
-        for(var thread_id in updated)
-        {
-            var thread_elem = Panels.cct.get_thread_elem(thread_id);
-            Panels.cct.update_thread_label(thread_elem);
-            for(var j = 0; j < updated[thread_id].nodes.length; j++)
-            {
-                var node = updated[thread_id].nodes[j];
-                var node_elem = Panels.cct.get_node_elem(thread_id, node.id, true, node.pid);
-                Panels.cct.update_label(node_elem);
-
-            }
-        }
-
-    },
-    
-    add_node: function(parent_elem, thread_id, node_id){
-        var node_elem_id = "node_th_" + thread_id + "_" + node_id;
-        parent_elem.children(".children").append("<div class='treenode' id='" + node_elem_id + "'><div class='nodelabel'></div></div>");
-        this.cct_dict[node_elem_id] = 1;
-        var node_elem = $("#" + node_elem_id);
-        node_elem.attr("nodeid", node_id);
-        node_elem.attr("threadid", thread_id);
-        Panels.cct.update_label(node_elem);
-        
-        node_elem.children(".nodelabel")
-            .click(function(e){
-                    Panels.cct.open_node_elem($(this).parent()); 
-                    e.preventDefault();
-            })
-            .mouseenter(function(e){
-                $(this).addClass("nodelabel_hover");
-            })
-            .mouseleave(function(e){
-                $(this).removeClass("nodelabel_hover");
-            })
-        ;
-        if(node_id in this.open_nodes)
-        {
-            this.open_node_elem(node_elem);
-        }
-        return node_elem;
-    },
-    
-    ids_to_elemid: function(thread_id, node_id)
-    {
-        return "node_th_" + thread_id + "_" + node_id;
-    },
-
-    elem_to_node_elemid: function(node)
-    {
-        return this.ids_to_elemid(node.attr("threadid"), node.attr("nodeid"));
-    },
-    
-    open_node_elem: function(elem)
-    {
-        if(elem.children(".children").length != 0)
-        {
-            delete this.open_nodes[elem.attr("nodeid")];
-            elem.children(".children").remove();
-            this.cct_dict[this.elem_to_node_elemid(elem)] = 1;
-            return;
-        }
-        elem.append("<div class='children'></div>");
-        this.last_opened = {threadid: elem.attr("threadid"), nodeid: elem.attr("nodeid")};
-
-        var thread_id = this.last_opened.threadid;
-        var node = g_target_cct[thread_id].nodes[this.last_opened.nodeid];
-        this.open_nodes[this.last_opened.nodeid] = node;
-        this.cct_dict[this.ids_to_elemid(thread_id, this.last_opened.nodeid)] = 2;
-        
-        for(var id in node.cid)
-        {
-            var node_elem = Panels.cct.add_node(elem, thread_id, id);
-        }
-    },
-    
-    hide: function()
-    {
-        
-    }
-};
-
-
-Panels.list = {
-    
-    init: function()
-    {
-        this.namecol = {
-            width: 400
-        };
-        
-        this.col = [
-            {idx: g_target_pv_index, mode: "all", width: 140},
-            {idx: g_target_pv_index, mode: "self", width: 140}
-        ];
-        $("#mainpanel").html("<table id='mtbl_header'></table><div id='mtbl_scroll'><table id='mtbl'></table></div>");
-        $('#mtbl_scroll').css('overflow', 'scroll');
-    },
-
-    update_column: function()
-    {
-        $('#mtbl_header').html("<th id='lhead_name'>name</th>");
-        $("#list_body_head").html("<th id='lbodyhead_name'></th>");
-        
-        $('#lhead_name').width(this.namecol.width);
-        $('#lbodyhead_name').width(this.namecol.width);
-        for(var i = 0; i < this.col.length; i++)
-        {
-            var col = this.col[i];
-            $('#mtbl_header').append("<th id='lhead_"+i+"'>" + g_metadata[col.idx].field_name + "(" + col.mode + ")</th>");
-            $("#lhead_"+i).width(col.width);
-            $("#list_body_head").append("<th id='lbodyhead_"+i+"'> </th>");
-            $("#lbodyhead_"+i).width(col.width);
-        }
-        
-        
-        this.update_view();
-    },
-
-    tree_reload: function()
-    {
-        this.list = {};
-        this.ordered = [];
-        this.num_items = 0;
-        this.unordered = [];
-        $('#mtbl').html("<tr id='list_body_head'></tr>");
-        
-        
-        for(var thread_id in g_target_cct)
-        {
-            var thread = g_target_cct[thread_id];
-            for(var key in thread.nodes)
-            {
-                var node = thread.nodes[key];
-                this.update_item(thread, node);
-            }
-        }
-        this.update_column();
-    },
-
-    update_size: function()
-    {
-        var mp = $('#mainpanel');
-        $('#mtbl_scroll').height(mp.height());
-        $('#mtbl_scroll').width(mp.width());
-    },
-    
-    update_item: function(thread, node)
-    {
-        var thread_id = thread.id;
-        var item_id = "li_" + thread_id + "_" + node.name;
-        
-        if(!(item_id in this.list))
-        {
-            var node_stock = this.list[item_id] = {
-                name: node.name,
-                id: node.id,
-                all: new Array(g_metadata.length),
-                cld: new Array(g_metadata.length),
-                opos: -2
-            };
-            for(var i = 0; i < g_metadata.length; i++)
-                node_stock.all[i] = node_stock.cld[i] = 0;
-            this.unordered.push(node_stock);
-            this.num_items++;
-            $('#mtbl').append("<tr id='tbl_"+(this.num_items-1)+"'><td>0</td></tr>");
-        }
-        else
-        {
-            node_stock = this.list[item_id];
-            if(node_stock.opos >= 0)
-            {
-                assert(this.ordered[node_stock.opos].id == node_stock.id, "Id not match");
-                node_stock.opos = -1;
-            }
-        }
-        accumurate(node_stock, node, thread);
-    },
-
-    merge_orderd: function()
-    {
-        var cmp_func = function(a,b) {return -(a.all[0] - b.all[0]);};
-
-        for(var i = 0; i < this.ordered.length; i++)
-        {
-            if(this.ordered[i].opos < 0)
-            {
-                this.unordered.push(this.ordered[i]);
-                this.ordered.splice(i, 1);
-                i--;
-            }
-        }
-
-        this.unordered.sort(cmp_func);
-        for(var i = 0; i < this.ordered.length; i++)
-        {
-            if(this.unordered.length > 0 && cmp_func(this.ordered[i], this.unordered[0]) > 0)
-            {
-                this.ordered.splice(i, 0, this.unordered.shift());
-            }
-            this.ordered[i].opos = i;
-        }
-        while(this.unordered.length != 0)
-        {
-            var node_stock = this.unordered.shift();
-            node_stock.opos = this.ordered.length;
-            this.ordered.push(node_stock);
-        }
-
-    },
-
-    update_view: function()
-    {
-        this.merge_orderd();
-
-        for(var i = 0; i < this.ordered.length && i < 100; i++)
-        {
-            var node_stock = this.ordered[i];
-            var html = "<td>" + node_stock.name + "</td>";
-
-            for(var j = 0; j < this.col.length; j++)
-            {
-                var col = this.col[j];
-                html += "<td class='number'>";
-                
-                // get_profile_value_** は使わない
-                //  -> accumurateで既につかってる
-                if(col.mode == "all")
-                    html += node_stock.all[col.idx];
-                else if(col.mode == "self")
-                {
-                    var v = (node_stock.all[col.idx] - node_stock.cld[col.idx]);
-                    if(v < 0)
-                        v = -1;
-                    html += v;
-                }
-                html += "</td>";
-            }
-            $('#tbl_' + i).html(html);
-        }
-    },
-    
-    update: function(updated)
-    {
-        for(var thread_id in updated)
-        {
-            var thread_elem = Panels.cct.get_thread_elem(thread_id);
-            Panels.cct.update_thread_label(thread_elem);
-            for(var j = 0; j < updated[thread_id].nodes.length; j++)
-            {
-                var node = updated[thread_id].nodes[j];
-                Panels.list.update_item(updated[thread_id], node);
-                
-            }
-        }
-        this.update_view();
-    },
-    
-    hide: function()
-    {
-        
-    }
-};
-
-
-
-Panels.square = {
-    
-    depth_value: 5,
-    
-    init: function()
-    {
-        this.update_timer_enabled = false;
-        if(!this.open_nodes)
-            this.open_nodes = {};
-
-        $("#mainpanel").html("<div id='sqv_ctrl'><div id='sq_depth_bar'></div></div><div id='sqv_parent'></div>");
-        $("#sqv_ctrl")
-            .height(30)
-        ;
-        $('#sq_depth_bar').slider({
-            min: 2,
-            max: 30,
-            value: this.depth_value,
-            slide: function(e, ui){
-                if(!Panels.square.update_timer_enabled)
-                {
-                    Panels.square.update_timer_enabled = true;
-                    setTimeout(function(){Panels.square.update_sq();}, 500);
-                }
-            }
-        });
-
-    },
-
-    tree_reload: function()
-    {
-        this.update_sq();
-    },
-
-    update_sq: function()
-    {
-        $('#debug2').html("");
-        $("#sqv_parent")
-            .css("position", "relative")
-            .width($("#mainpanel").width())
-            .height($("#mainpanel").height() - 30)
-            .html("")
-        ;
-        if(!g_target_cct || !("0" in g_target_cct))
-        {
-            return;
-        }
-        
-        var thread = g_target_cct["0"];
-        if(!thread)
-            return;
-        var root = thread.nodes[ROOT_NODE_ID];
-        if(!root)
-            return;
-
-        this.draw({
-            target_elem: $("#sqv_parent"),
-            thread: thread,
-            node: root,
-            x: 0,
-            y: 0,
-            w: $("#sqv_parent").width(),
-            h: $("#sqv_parent").height(),
-            z: 0,
-            depth: 0,
-            color: 0,
-            max_depth: $('#sq_depth_bar').slider("option", "value"),
-        });
-        
-        this.depth_value = $('#sq_depth_bar').slider("option", "value");
-
-    },
-    
-    update_size: function()
-    {
-        
-    },
-
-    draw: function(data)
-    {
-        // $('#debug2').append("rect: " + data.x + ", " + data.y + ", " + data.w + ", " + data.h + ";<br />");
-        if(data.depth >= data.max_depth)
-            return;
-
-        var current_node_pv = get_profile_value_all(data.thread, data.node, g_target_pv_index);
-        data.target_elem.append("<div class='sqv_sq' id='node_" + data.node.id + "'> </div>");
-        $('#node_' + data.node.id)
-            .css("left", data.x)
-            .css("top", data.y)
-            .css("z-index", data.z)
-            .css("background-color", g_colors[data.color % g_colors.length])
-            .width(data.w)
-            .height(data.h)
-            .html(data.node.name + " (ID:" + data.node.id + " PV:" + current_node_pv + ")")
-        ;
-
-        var allval = 0.0;
-        var values = {};
-        for(var key in data.node.cid)
-        {
-            var cnode = data.node.cid[key];
-            values[cnode.id] = get_profile_value_all(data.thread, cnode, g_target_pv_index);
-            allval += values[cnode.id];
-        }
-        if(current_node_pv > allval)
-            allval = current_node_pv;
-
-        var psum = 0.0;
-        var cur_color = data.color + 1;
-        for(var key in data.node.cid)
-        {
-            var cnode = data.node.cid[key];
-            var p = values[cnode.id] / allval;
-            
-            
-            var next_data = {
-                target_elem: data.target_elem,
-                node: cnode,
-                thread: data.thread,
-                depth: data.depth,
-                max_depth: data.max_depth,
-                z: data.z + 1,
-                color: cur_color
-            };
-            cur_color++;
-            if(data.depth % 2 == 0)
-            {
-                next_data.x = data.x + data.w * psum;
-                next_data.y = data.y;
-                next_data.w = data.w * p;
-                next_data.h = data.h;
-            }
-            else
-            {
-                next_data.x = data.x;
-                next_data.y = data.y + data.h * psum;
-                next_data.w = data.w;
-                next_data.h = data.h * p;
-            }
-            next_data.depth += 1;
-            next_data.x += 2;
-            next_data.y += 2;
-            next_data.w -= 4;
-            next_data.h -= 4;
-            if(next_data.w > 2 && next_data.h > 2)
-                this.draw(next_data);
-            psum += p;
-            // assert(psum <= 1.1, "psum <= 1.1");
-        }
-    },
-
-    
-
-    update: function(updated)
-    {
-        this.update_sq();
-
-    },
-    
-    
-    hide: function()
-    {
-        
-    }
-};
 
 
 
@@ -1078,6 +551,29 @@ function fetch_table_data(req)
 }
 
 
+
+function show_pending()
+{
+    $('#pendingpanel')
+        .html("Loading...")
+        .css("position", "absolute")
+        .css("background-color", "black")
+        .css("top", "0px")
+        .css("left", "0px")
+        .css("z-index", "10")
+        .width($(window).width())
+        .height($(window).height())
+        .css("opacity", "0.5")
+        .show();
+}
+
+function hide_pending()
+{
+    $('#pendingpanel').hide();
+    
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 // Navigator
 //////////////////////////////////////////////////////////////////////////
@@ -1101,9 +597,8 @@ function update_nav()
 
     var before_real_time = g_timenav.real_time;
     g_timenav.real_time = ($("#check_realtime").attr("checked") ? true : false);
-    g_timenav.select_time = $("#timebar").slider("option", "value");
-    g_timenav.select_width = $("#timewidthbar").slider("option", "value");
-
+    g_timenav.select_time = g_timenav_data.pos;
+    g_timenav.select_width = g_timenav_data.width;
     $("#timebar_value").html(g_timenav.select_time);
     $("#timewidthbar_value").html(g_timenav.select_width);
 
@@ -1119,11 +614,165 @@ function update_nav()
 }
 
 
+g_timenav_data = {
+    width: 10,
+    pos: 0,
+    max: 100,
+    bar_size: 600,
+    start_pagex: null,
+    drag_mode: null,
+    least_width: 18,
+    button_width: 18,
+};
+function init_time_nav()
+{
+    var bar_sel = '#timebar';
+    $(bar_sel).html("<div class='bar'><div class='bar_selector'><div class='btn_l'>&lt;</div><div class='label'>i</div><div class='btn_r'>&gt;</div></div></div>");
+    
+    g_timenav_data.px_per_val = (g_timenav_data.bar_size - g_timenav_data.least_width - g_timenav_data.button_width*2) / g_timenav_data.max;
+
+    $(bar_sel + ' .bar')
+        .css("height", "24px")
+        .css("border", "1px solid #AAA")
+    ;
+
+    $('#modepanel')
+            .mousemove(function(e){
+            if(g_timenav_data.drag_mode != null)
+            {
+                e.preventDefault();
+                var diff = (e.pageX - g_timenav_data.start_pagex) / g_timenav_data.px_per_val;
+                if(g_timenav_data.drag_mode == "pos")
+                {
+                    g_timenav_data.pos = g_timenav_data.start_pos + diff;
+                }
+                else if(g_timenav_data.drag_mode == "left")
+                {
+                    g_timenav_data.width = g_timenav_data.start_width - diff;
+                    g_timenav_data.pos = g_timenav_data.start_pos + diff;
+                }
+                else if(g_timenav_data.drag_mode == "right")
+                {
+                    g_timenav_data.width = g_timenav_data.start_width + diff;
+                }
+                update_time_nav({"controlled": true});
+            }
+        })
+        .mouseup(function(e){
+            g_timenav_data.drag_mode = null;
+        })
+        .mouseleave(function(e){
+            g_timenav_data.drag_mode = null;
+        })
+
+    $(bar_sel + ' .bar_selector')
+        .css("cursor", "move")
+        .css("height", "24px")
+        .css("background-color", "#DDDDFF")
+        .css("font-size", "12px")
+        .css("text-align", "center")
+    ;
+
+    $(bar_sel + ' .bar_selector .label')
+        .mousedown(function(e){
+            g_timenav_data.start_pagex = e.pageX;
+            g_timenav_data.start_pos = g_timenav_data.pos;
+            g_timenav_data.drag_mode = "pos";
+            e.preventDefault();
+        })
+        .css("float", "left")
+        .css("height", "24px")
+    ;
+
+    $(bar_sel + ' .btn_l').add(bar_sel + ' .btn_r')
+        .css("height", "22px")
+        .css("width", "" + (g_timenav_data.button_width) + "px")
+        .css("background-color", "#DDDDFF")
+        .css("border", "1px solid #000")
+        .css("cursor")
+    ;
+
+    $(bar_sel + ' .btn_l')
+        .css("float", "left")
+        .css("cursor", "w-resize")
+        .mousedown(function(e){
+            g_timenav_data.start_pagex = e.pageX;
+            g_timenav_data.drag_mode = "left";
+            g_timenav_data.start_pos = g_timenav_data.pos;
+            g_timenav_data.start_width = g_timenav_data.width;
+            e.preventDefault();
+        })
+    ;
+    $(bar_sel + ' .btn_r')
+        .css("float", "right")
+        .css("cursor", "e-resize")
+        .mousedown(function(e){
+            g_timenav_data.start_pagex = e.pageX;
+            g_timenav_data.drag_mode = "right";
+            g_timenav_data.start_pos = g_timenav_data.pos;
+            g_timenav_data.start_width = g_timenav_data.width;
+            e.preventDefault();
+        })
+    ;
+    update_time_nav({});
+}
+
+function update_time_nav(data)
+{
+    var bar_sel = '#timebar';
+
+    if(!data)
+        data = {};
+    for(var k in data)
+    {
+        g_timenav_data[k] = data[k];
+    }
+    
+    if(g_timenav_data.pos > g_timenav_data.max - g_timenav_data.width)
+        g_timenav_data.pos = g_timenav_data.max - g_timenav_data.width;
+    if(g_timenav_data.pos < 0)
+        g_timenav_data.pos = 0;
+
+        
+    var wmax = Math.min(40, g_timenav_data.max - g_timenav_data.pos);
+    if(g_timenav_data.width > wmax)
+        g_timenav_data.width = wmax;
+
+    if(g_timenav_data.width < 1)
+        g_timenav_data.width = 1;
+
+    g_timenav_data.pos = Math.floor(g_timenav_data.pos);
+    g_timenav_data.width = Math.floor(g_timenav_data.width);
+    g_timenav_data.px_per_val = (g_timenav_data.bar_size - g_timenav_data.least_width - g_timenav_data.button_width*2) / g_timenav_data.max;
+    var px_per_val = g_timenav_data.px_per_val;
+
+    $(bar_sel + ' .bar')
+        .css("width", ""+ g_timenav_data.bar_size +"px")
+    ;
+    $(bar_sel + ' .bar_selector')
+        .css("width", "" + (g_timenav_data.width * px_per_val + g_timenav_data.least_width + g_timenav_data.button_width*2) + "px")
+        .css("margin-left", "" + (g_timenav_data.pos * px_per_val) + "px")
+    ;
+    $(bar_sel + ' .bar_selector .label')
+        .html("" + (g_timenav_data.width))
+        .width((g_timenav_data.width * px_per_val + g_timenav_data.least_width - 8))
+    ;
+
+    if(data.controlled)
+    {
+        update_nav();
+    }
+}
+
 $(function(){
     setTimeout(update_ui, 500);
     fit_panel();
     $(window).resize(fit_panel);
 
+    
+    init_time_nav();
+    
+    /*
     $('#timebar').slider({
         min: 0,
         max: 10,
@@ -1136,7 +785,8 @@ $(function(){
         startValue: 1,
         slide: update_nav
     });
-        
+    */
+
     $("#view_select").change(update_nav);
     
     $('#check_realtime').click(update_nav);
