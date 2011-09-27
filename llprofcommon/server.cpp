@@ -23,8 +23,8 @@ string g_profile_target_name;
 int gServerStartedFlag;
 pthread_t gServerThread;
 
-int g_aggressive_thread_started = 0;
-pthread_t g_aggressive_thread;
+int g_client_thread_started = 0;
+pthread_t g_client_thread;
 
 
 
@@ -270,9 +270,9 @@ void *llprof_server_thread(void *p)
 }
 
 
-void *llprof_aggressive_thread(void *p)
+void *llprof_client_thread(void *p)
 {
-    cout << "Aggressive Thread: Start" << endl;
+    cout << "Client Thread: Start" << endl;
 #   ifdef _WIN32
         WSADATA wsaData;
         WSAStartup(MAKEWORD(2,0), &wsaData);
@@ -280,21 +280,21 @@ void *llprof_aggressive_thread(void *p)
 
     string host, port;
     int interval = 0;
-    if(!getenv("LLPROF_AGG_HOST") || strlen(getenv("LLPROF_AGG_HOST")) == 0)
+    if(!getenv("LLPROF_CM_HOST") || strlen(getenv("LLPROF_CM_HOST")) == 0)
     {
-        cout << "Aggressive Thread: Exit (No LLPROF_AGG_HOST)" << endl;
+        cout << "Client Thread: Exit (No LLPROF_CM_HOST)" << endl;
         return NULL;
     }
-    host = getenv("LLPROF_AGG_HOST");
+    host = getenv("LLPROF_CM_HOST");
 
-    if(getenv("LLPROF_AGG_PORT"))
-        port = getenv("LLPROF_AGG_PORT");
+    if(getenv("LLPROF_CM_PORT"))
+        port = getenv("LLPROF_CM_PORT");
     else
         port = "12300";
     
-    if(getenv("LLPROF_AGG_INTERVAL"))
+    if(getenv("LLPROF_CM_INTERVAL"))
     {
-        interval = atoi(getenv("LLPROF_AGG_INTERVAL"));
+        interval = atoi(getenv("LLPROF_CM_INTERVAL"));
         if(interval < 4)
             interval = 4;
     } else
@@ -304,13 +304,13 @@ void *llprof_aggressive_thread(void *p)
     
     while(true)
     {
-        cout << "Aggressive Thread: try" << endl;
+        cout << "Client Thread: try" << endl;
         int sock = SocketConnectTo(host, port);
         if(sock != -1)
         {
-            cout << "Aggressive Thread: connected:" << sock << endl;
+            cout << "Client Thread: connected:" << sock << endl;
             llprof_message_dispatch(sock);
-            cout << "Aggressive Thread: diconnected" << endl;
+            cout << "Client Thread: diconnected" << endl;
         }
         sleep(interval);
     }
@@ -327,10 +327,10 @@ void llprof_start_server()
 
 }
 
-void llprof_start_aggressive_thread()
+void llprof_start_client_thread()
 {
-    pthread_create(&g_aggressive_thread, NULL, llprof_aggressive_thread, NULL);
-    pthread_detach(g_aggressive_thread);
+    pthread_create(&g_client_thread, NULL, llprof_client_thread, NULL);
+    pthread_detach(g_client_thread);
 }
 
 void llprof_set_target_name(const string &name)

@@ -12,8 +12,8 @@
 // Profilerの初期化
 void llprof_init();
 
-// アグレッシブモードの設定
-void llprof_aggressive(bool enabled);
+// クライアントモードの設定
+void llprof_client(bool enabled);
 
 
 #endif // LLPROF_H

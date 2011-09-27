@@ -11,7 +11,7 @@
 // サーバースレッドの開始
 void llprof_start_server();
 
-void llprof_start_aggressive_thread();
+void llprof_start_client_thread();
 
 void SendMessage(int sock, int msg_id, const void *buf, int buf_sz);
 void SendMessage2(int sock, int msg_id, const void *buf1, int buf_sz1, const void *buf2, int buf_sz2);

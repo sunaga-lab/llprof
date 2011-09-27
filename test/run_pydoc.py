@@ -9,5 +9,5 @@ import pyllprof
 os.mkdir("pydocs")
 os.chdir("pydocs")
 
-pydoc.writedocs("/usr/lib/python3.1")
+pydoc.writedocs("/usr/lib/python2.7")
 

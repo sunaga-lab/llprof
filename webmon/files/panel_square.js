@@ -40,8 +40,13 @@ add_panel("square", {
             .css("position", "relative")
             .width($("#mainpanel").width())
             .height($("#mainpanel").height() - 30)
-            .html("")
         ;
+        var sq_dom = $("<div />");
+        sq_dom
+            .width($("#mainpanel").width())
+            .height($("#mainpanel").height() - 30)
+        ;
+        
         if(!g_target_cct || !("0" in g_target_cct))
         {
             return;
@@ -55,7 +60,7 @@ add_panel("square", {
             return;
 
         this.draw({
-            target_elem: $("#sqv_parent"),
+            target_elem: sq_dom,
             thread: thread,
             node: root,
             x: 0,
@@ -69,7 +74,8 @@ add_panel("square", {
         });
         
         this.depth_value = $('#sq_depth_bar').slider("option", "value");
-
+        $("#sqv_parent").html("");
+        $("#sqv_parent").append(sq_dom);
     },
     
     update_size: function()
@@ -84,8 +90,9 @@ add_panel("square", {
             return;
 
         var current_node_pv = get_profile_value_all(data.thread, data.node, g_target_pv_index);
-        data.target_elem.append("<div class='sqv_sq' id='node_" + data.node.id + "'> </div>");
-        $('#node_' + data.node.id)
+        
+        var elem = $("<div class='sqv_sq' id='node_" + data.node.id + "'> </div>");
+        elem
             .css("left", data.x)
             .css("top", data.y)
             .css("z-index", data.z)
@@ -94,6 +101,7 @@ add_panel("square", {
             .height(data.h)
             .html(data.node.name + " (ID:" + data.node.id + " PV:" + current_node_pv + ")")
         ;
+        data.target_elem.append(elem);
 
         var allval = 0.0;
         var values = {};

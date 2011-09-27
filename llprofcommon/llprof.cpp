@@ -6,7 +6,7 @@
 #include "record_type.h"
 using namespace std;
 
-bool g_aggressive_mode = true;
+bool g_client_mode = true;
 
 void llprof_init()
 {
@@ -31,16 +31,16 @@ void llprof_init()
 
     llprof_calltree_init();
     llprof_start_server();
-    if(g_aggressive_mode)
+    if(g_client_mode)
     {
-        llprof_start_aggressive_thread();
+        llprof_start_client_thread();
     }
 }
 
 
 
-// アグレッシブモードの設定
-void llprof_aggressive(bool enabled)
+// クライアントモードの設定
+void llprof_client(bool enabled)
 {
-    g_aggressive_mode = enabled;
+    g_client_mode = enabled;
 }

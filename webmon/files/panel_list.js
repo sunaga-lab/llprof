@@ -144,7 +144,7 @@ add_panel("list", {
         var iend = Math.floor(($('#mtbl_scroll').scrollTop() + $('#mtbl_scroll').height()) / h) + this.scroll_padding;
         istart = Math.max(istart, 0);
         iend = Math.min(iend, this.ordered.length);
-        
+        iend = Math.min(iend, istart+100);
         for(var i = istart; i <= iend; i++)
         {
             $('#tbl_' + i).css("background-color", "white");
@@ -160,7 +160,10 @@ add_panel("list", {
                 // get_profile_value_** は使わない
                 //  -> accumurateで既につかってる
                 if(col.mode == "all")
-                    html += node_stock.all[col.idx];
+                {
+                    if(node_stock && node_stock.all && node_stock.all[col.idx])
+                        html += node_stock.all[col.idx];
+                }
                 else if(col.mode == "self")
                 {
                     var v = (node_stock.all[col.idx] - node_stock.cld[col.idx]);

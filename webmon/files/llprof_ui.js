@@ -2,7 +2,8 @@
 g_current_target = null;
 g_active_panel = null;
 g_default_panel = null;
-g_target_cct = null;
+g_target_cct = {};
+g_clear_cct = true;
 g_now_info = {};
 g_metadata = {};
 g_target_pv_index = 0;
@@ -98,17 +99,7 @@ function update_ui_target_list(data)
     {
         if(g_timenav.real_time)
         {
-            if(g_target_cct)
-            {
-                $.ajax({
-                    type: "POST",
-                    url: "/ds/tree/" + g_current_target + "/diff/" + (g_timenav.max_time+1),
-                    data: {},
-                    dataType: "json",
-                    success: update_ui_cct,
-                });
-            }
-            else
+            if(g_clear_cct)
             {
                 g_target_cct = {};
                 $.ajax({
@@ -116,20 +107,32 @@ function update_ui_target_list(data)
                     url: "/ds/tree/" + g_current_target + "/current",
                     data: {},
                     dataType: "json",
-                    success: update_ui_cct,
+                    success: update_ui_data,
                 });
             }
+            else
+            {
+                $.ajax({
+                    type: "POST",
+                    url: "/ds/tree/" + g_current_target + "/diff/" + (g_timenav.max_time+1),
+                    data: {},
+                    dataType: "json",
+                    success: update_ui_data,
+                });
+            }
+
         }else
         {
-            var time_selection_start = g_timenav.select_time + 1 - g_timenav.select_width;
-            if(time_selection_start > g_timenav.select_time)
-                time_selection_start = g_timenav.select_time;
+            if(!g_target_cct)
+                g_target_cct = {};
+            var start_tm = g_timenav.select_time+1;
+            var end_tm = start_tm + g_timenav.select_width - 1;
             $.ajax({
                 type: "POST",
-                url: "/ds/tree/" + g_current_target + "/diff/" + time_selection_start + "/" + g_timenav.select_time,
+                url: "/ds/tree/" + g_current_target + "/diff/" + start_tm + "/" + end_tm,
                 data: {},
                 dataType: "json",
-                success: update_ui_cct,
+                success: update_ui_data,
             });
         }
     }
@@ -137,7 +140,6 @@ function update_ui_target_list(data)
     {
         count_update_counter();
     }
-    hide_pending();
 
 }
 
@@ -194,7 +196,7 @@ function fmt_date(d)
     return "" + yy + "/" + mm + "/" + dd + " " + hh + ":" + min + ":" + sec;
 }
 
-function update_ui_cct(data)
+function update_ui_data(data)
 {
     var updateStart = new Date();
     var update_threads = {};
@@ -203,7 +205,7 @@ function update_ui_cct(data)
     if(g_timenav.real_time)
     {
         g_timenav.max_time = data.timenum;
-        update_time_nav({"max": g_timenav.max_time});
+        update_time_nav({max: g_timenav.max_time-1});
     }
     else
     {
@@ -299,12 +301,16 @@ function update_ui_cct(data)
         + " nDiv:" + ($('div').length)
     ;
     count_update_counter();
+
+    hide_pending();
+
 }
 
 function show_target(id)
 {
     show_pending();
-    g_target_cct = null;
+    g_clear_cct = true;
+
     g_current_target = id;
     g_timenav.max_time = 0;
     update_nav();
@@ -487,7 +493,7 @@ function fetch_table_data(req)
     }
     $.ajax({
         type: "POST",
-        url: "/ds/tree/" + g_current_target + "/diff/" + (req.start_time - req.timewidth + 1) + "/" + req.start_time,
+        url: "/ds/tree/" + g_current_target + "/diff/" + req.start_time + "/" + (req.start_time + req.timewidth - 1),
         data: {},
         dataType: "json",
         success: function(data){
@@ -581,18 +587,11 @@ function hide_pending()
 
 function update_nav()
 {
-    var panelname = $("#view_select").val();
-    if(g_active_panel && Panels[g_active_panel])
-    {
-        Panels[g_active_panel].hide();
-    }
-    if(!panelname && !g_active_panel)
-        g_active_panel = g_default_panel;
-    else if(panelname)
-        g_active_panel = panelname;
-    Panels[g_active_panel].init();
-    Panels[g_active_panel].tree_reload();
-
+    
+    if('tree_reload' in Panels[g_active_panel])
+        Panels[g_active_panel].tree_reload();
+    else
+        Panels[g_active_panel].init();
 
 
     var before_real_time = g_timenav.real_time;
@@ -604,7 +603,7 @@ function update_nav()
 
     if(!before_real_time || !g_timenav.real_time)
     {
-        g_target_cct = null;
+        g_clear_cct = true;
     }
     g_need_update_counter = 1;
 
@@ -769,7 +768,35 @@ $(function(){
     fit_panel();
     $(window).resize(fit_panel);
 
+    $('#view_select').html("");
+    g_active_panel = g_default_panel;
+    for(var key in Panels)
+    {
+        var label = key;
+        if('label' in Panels[key])
+            label = Panels[key].label;
+            
+        var selected_html = (g_active_panel == key ? " selected='selected'" : "");
+        $('#view_select').append(
+            "<option value='" + key + "'"+ selected_html +">" + label + "</option>"
+        );
+    }
+    $('#view_select').change(function(e){
+        var panelname = $("#view_select").val();
+        if(g_active_panel && Panels[g_active_panel])
+            Panels[g_active_panel].hide();
+        if(!panelname && !g_active_panel)
+            g_active_panel = g_default_panel;
+        else if(panelname)
+            g_active_panel = panelname;
+        Panels[g_active_panel].init();
+        update_nav();
+    });
+
+    Panels[g_active_panel].init();
     
+    
+        
     init_time_nav();
     
     /*
