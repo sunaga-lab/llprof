@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension name="llprofpm" version="1.0.0">
+  <summary>LLProf Profiling Module for PHP</summary>
+  <description><?data
+LLProf Profiling Module for PHP
+  ?></description>
+
+  <maintainers>
+    <maintainer>
+      <user>sunagae</user>
+      <name>Takahiro Sunaga</name>
+      <email>sunagae@sunagae.net</email>
+      <role>lead</role>
+    </maintainer>
+  </maintainers>
+
+  <license>PHP</license>
+
+  <channel>__uri</channel>
+
+  <release>
+    <version>1.0.0</version>
+    <date>2011-11-01</date>
+    <state>devel</state>
+    <notes><?data
+- Initial release.
+    ?></notes>
+  </release>
+
+  <function name="helloworld" role="public">
+    <proto>void helloworld()</proto>
+    <summary>Hello, World!</summary>
+    <description><?data
+test function
+    ?></description>
+    <code><?data
+php_printf("Hello, World!%s", PHP_EOL);
+    ?></code>
+    <test>
+      <code><?data
+helloworld();
+      ?></code>
+      <result mode="plain"><?data
+Hello, World!
+      ?></result>
+    </test>  
+  </function>
+</extension>
