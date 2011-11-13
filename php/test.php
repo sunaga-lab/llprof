@@ -1,26 +1,21 @@
 <?php
 
-
-
-
-
-function tak($x,$y,$z){
+function php_tak($x,$y,$z){
     if($x <= $y){
         return $y;
     }
     else
     {
-        return tak(tak($x-1,$y,$z),tak($y-1,$z,$x),tak($z-1,$x,$y));
+        return php_tak(php_tak($x-1,$y,$z),php_tak($y-1,$z,$x),php_tak($z-1,$x,$y));
     }
 }
 
 
 function a()
 {
-    tak(12,6,0);
+    php_tak(12,6,0);
 }
 
 a();
-b();
 
 ?>

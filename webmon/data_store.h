@@ -163,6 +163,8 @@ protected:
     NodeID id_, parent_id_;
     NameID node_name_;
     vector<ProfileValue> all_values_, children_values_;
+    uint64_t call_count_;
+    
     bool running_;
     virtual void UpdateDataStore(){};
     
@@ -170,6 +172,7 @@ public:
     RecordNodeBasic()
     {
         running_ = false;
+        call_count_ = 0;
     }
     void SetDataStore(DataStore *ds, bool strippable = false);
     NodeID GetNodeID() const {return id_;}
@@ -192,6 +195,10 @@ public:
     const vector<ProfileValue> &GetAllValues() const {return all_values_;}
     const vector<ProfileValue> &GetChildrenValues() const {return children_values_;}
 
+    uint64_t GetCallCount() const {return call_count_;}
+    void SetCallCount(uint64_t cc){call_count_ = cc;}
+
+
     DataStore *GetDataStore() const {return ds_;}
     
     void Accumulate(const RecordNodeBasic &rhs);
@@ -210,9 +217,11 @@ inline ostream &operator <<(ostream &s, const RecordNodeBasic &md)
 class RecordNode: public RecordNodeBasic
 {
     vector<ProfileValue> temp_values_;
+    uint64_t temp_call_count_;
     bool dirty_;
     set<NodeID> children_id_;
     NodeID gnid_;
+    
 
 protected:
     virtual void UpdateDataStore();
@@ -248,11 +257,14 @@ public:
     bool IsDirty() const {return dirty_;}
     
 
-    void SetTempValues(const vector<ProfileValue> &value)
+    void SetTempValues(const vector<ProfileValue> &value, uint64_t call_count)
     {
         assert(temp_values_.size() == value.size());
         temp_values_ = value;
+        temp_call_count_ = call_count;
     }
+    
+    uint64_t GetTempCallCount(){return temp_call_count_;}
     
     void ClearTempValues()
     {
@@ -260,6 +272,7 @@ public:
         {
             (*it) = 0;
         }
+        temp_call_count_ = 0;
     }
     
     void PrintToStream(ostream &out) const;

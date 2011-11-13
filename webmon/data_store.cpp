@@ -105,7 +105,7 @@ void* DataStore_ReceiveThread(void *data)
     while(true)
     {
         sleep(interval);
-        profile_value_t start_tv = get_time_now_nsec();
+        //  profile_value_t start_tv = get_time_now_nsec();
         for(map<int,DataStore*>::iterator iter = gAllDataStore->begin(); iter != gAllDataStore->end(); iter++)
         {
             (*iter).second->ReceiveLoop();
@@ -114,7 +114,7 @@ void* DataStore_ReceiveThread(void *data)
         if(gGlobalDataStore)
             gGlobalDataStore->Integrate();
         
-        /// cout << "Fetch Time: " << (double(get_time_now_nsec() - start_tv) / 1000.0 / 1000.0 / 1000.0 ) << endl;
+        // cout << "Fetch Time: " << (double(get_time_now_nsec() - start_tv) / 1000.0 / 1000.0 / 1000.0 ) << endl;
     }
     return NULL;
 }
@@ -475,6 +475,7 @@ void write_json(stringstream &strm, const RecordNodeBasic &node)
     ProfileValuesToStream(s, node.GetChildrenValues());
     out.add<stringstream &>("cld", s);
     
+    out.add<unsigned long long int>("cc", node.GetCallCount());
 
 }
 
@@ -517,8 +518,9 @@ TimeSliceStore *ThreadStore::MergeTimeSlice(map<NodeID, RecordNodeBasic> &integr
                 node.SetNameID(current_tree_[(*it).first].GetNameID());
                 pos = integrated.find((*it).first);
             }
-            if((*it).first == 5)
-                (*pos).second.GetAllValues()[0] += 200;
+            // for debug
+            //if((*it).first == 5)
+            //    (*pos).second.GetAllValues()[0] += 200;
             (*pos).second.Accumulate((*it).second);
         }
     } 
@@ -680,6 +682,7 @@ void ThreadStore::Store(intrusive_ptr<MessageBuf> buf, intrusive_ptr<MessageBuf>
     int offset_nameid = ds_->GetMemberOffsetOf("pdata.nameid");
     int pdata_record_size = ds_->GetMemberOffsetOf("pdata.record_size");
     int offset_value = ds_->GetMemberOffsetOf("pdata.value");
+    int offset_call_count = ds_->GetMemberOffsetOf("pdata.call_count");
 
     buf->SetCurrentPtr(8);
     vector<ProfileValue> values(ds_->GetNumProfileValues());
@@ -691,7 +694,7 @@ void ThreadStore::Store(intrusive_ptr<MessageBuf> buf, intrusive_ptr<MessageBuf>
         unsigned int cnid = *(unsigned int *)(p + offset_call_node_id);
         unsigned int parent_cnid = *(unsigned int *)(p + offset_parent_node_id);
         NameID nameid = *(NameID *)(p + offset_nameid);
-        
+        unsigned long long int call_count = *(unsigned long long int *)(p + offset_call_count);
 
         
         map<NodeID, RecordNode>::iterator iter = current_tree_.find(cnid);
@@ -711,7 +714,7 @@ void ThreadStore::Store(intrusive_ptr<MessageBuf> buf, intrusive_ptr<MessageBuf>
             values[i] = ((ProfileValue *)(p + offset_value))[i];
         }
         MarkNodeDirty(&node);
-        node.SetTempValues(values);
+        node.SetTempValues(values, call_count);
         buf->Seek(pdata_record_size);
     }
     
@@ -764,7 +767,6 @@ bool ThreadStore::ClearDirtyNode(RecordNode *node, TimeSliceStore *tss)
                 if(!node->GetChildrenValues().empty())
                     node->GetChildrenValues()[i] += child->GetTempValues()[i];
                 tss_node->GetChildrenValues()[i] += child->GetTempValues()[i];
-
                 if(!ds_->GetRecordMetadata(i).AccumulatedValueFlag)
                 {
                     node->GetTempValues()[i] += child->GetTempValues()[i];
@@ -782,6 +784,7 @@ bool ThreadStore::ClearDirtyNode(RecordNode *node, TimeSliceStore *tss)
             if(!node->GetAllValues().empty())
                 node->GetAllValues()[i] = node->GetTempValues()[i];
             tss_node->GetAllValues()[i] = node->GetTempValues()[i];
+
         }
         else
         {
@@ -790,6 +793,8 @@ bool ThreadStore::ClearDirtyNode(RecordNode *node, TimeSliceStore *tss)
             tss_node->GetAllValues()[i] += node->GetTempValues()[i];
         }
     }
+    tss_node->SetCallCount(node->GetTempCallCount());
+    node->SetCallCount(node->GetTempCallCount() + node->GetCallCount());
     node->SetDirty(false);
     return true;
 }
@@ -815,6 +820,7 @@ void RecordNodeBasic::Accumulate(const RecordNodeBasic &rhs)
             children_values_[i] += rhs.children_values_[i];
         }
     }
+    call_count_ += rhs.call_count_;
 }
 
 TimeSliceStore::TimeSliceStore()
