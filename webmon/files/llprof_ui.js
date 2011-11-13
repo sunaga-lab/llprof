@@ -158,6 +158,7 @@ function accumurate(dest, src, thread)
             dest.cld[i] += get_profile_value_cld(thread, src, i);
         }
     }
+    dest.cc += src.cc;
 }
 
 function dprint(s)
@@ -263,6 +264,7 @@ function update_ui_data(data)
                     name: node.name,
                     all: node.all,
                     cld: node.cld,
+                    cc: node.cc,
                     running: false
                 };
                 g_target_cct[thread.id].nodes[node.id] = node_stock;
