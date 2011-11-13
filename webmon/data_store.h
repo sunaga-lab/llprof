@@ -198,6 +198,7 @@ public:
     uint64_t GetCallCount() const {return call_count_;}
     void SetCallCount(uint64_t cc){call_count_ = cc;}
 
+    void AddCallCount(uint64_t cc){call_count_ += cc;}
 
     DataStore *GetDataStore() const {return ds_;}
     

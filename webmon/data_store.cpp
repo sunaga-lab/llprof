@@ -1172,6 +1172,8 @@ void GlobalThreadStore::Integrate()
                         dest_current->GetChildrenValues()[i] += src->GetChildrenValues()[i];
                     }
                 }
+                dest->AddCallCount(src->GetCallCount());
+                dest_current->AddCallCount(src->GetCallCount());
             }
             if(IsSingleTreeMode())
             {
