@@ -13,7 +13,7 @@ int SendFull(int sock, const char *pbuf, int sz)
     int offset = 0;
     while(1)
     {
-        int wrote_sz = send(sock, pbuf + offset, sz - offset, 0);
+        int wrote_sz = send(sock, pbuf + offset, sz - offset, MSG_NOSIGNAL);
         if(wrote_sz <= 0)
             return 1;
         offset += wrote_sz;

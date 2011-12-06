@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import sys
 # sys.path.append('../pyllprof')
 
@@ -25,12 +25,13 @@ def main():
         t = timeit.Timer(stmt = f)
         print("Time", i, "=", t.timeit(number = 1))
 
-mode = "ll"
+mode = "no"
 if mode == "c":
 	import cProfile
 	cProfile.run("main()")
 elif mode == "ll":
 	import pyllprof
+	pyllprof.begin_profile("test")
 	main()
 else:
 	print("Without profiler")

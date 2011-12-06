@@ -20,6 +20,8 @@ map<int, DataStore*> *gAllDataStore;
 int gDataStoreIDSeq;
 pthread_t g_datastore_server_thread;
 GlobalDataStore *gGlobalDataStore;
+bool gLeafNodeAccumulate = true;
+
 
 bool IsSingleTreeMode()
 {
@@ -379,7 +381,7 @@ end_of_loop:
 ThreadStore::ThreadStore(DataStore *ds): ds_(ds)
 {
     running_node_ = 0;
-
+    current_attr_node_id_index_ = 0xFF000000;
     RecordNode *node = AddCurrentNode(1, 0, 0);
     node->SetGNID(1);
 }
@@ -696,15 +698,43 @@ void ThreadStore::Store(intrusive_ptr<MessageBuf> buf, intrusive_ptr<MessageBuf>
         NameID nameid = *(NameID *)(p + offset_nameid);
         unsigned long long int call_count = *(unsigned long long int *)(p + offset_call_count);
 
+        if(gLeafNodeAccumulate)
+        {
+            map<NodeID, NodeID>::iterator iter_alt_map = attr_node_id_alt_.find(cnid);
+            if(iter_alt_map != attr_node_id_alt_.end())
+            {
+                cnid = (*iter_alt_map).second;
+            }
+        }
         
         map<NodeID, RecordNode>::iterator iter = current_tree_.find(cnid);
         if(iter == current_tree_.end())
         {
-            RecordNode *node = AddCurrentNode(cnid, parent_cnid, nameid, true);
-            ds_->TouchGNID(this, node);
-            if(RecordNode *parent = GetNodeFromID(parent_cnid))
-                parent->AddChildID(cnid);
-            
+            bool cn_found = false;
+            if(gLeafNodeAccumulate)
+            {
+                map<pair<NodeID, NameID>, NodeID>::iterator it_anm = attr_node_map_.find(make_pair(parent_cnid, nameid));
+                if(it_anm != attr_node_map_.end())
+                {
+                    attr_node_id_alt_[cnid] = (*it_anm).second;
+                    cnid = (*it_anm).second;
+                    cn_found = true;
+                }
+            }
+            if(!cn_found)
+            {
+                RecordNode *node = AddCurrentNode(cnid, parent_cnid, nameid, true);
+                ds_->TouchGNID(this, node);
+                if(RecordNode *parent = GetNodeFromID(parent_cnid))
+                    parent->AddChildID(cnid);
+                if(gLeafNodeAccumulate)
+                {
+                    if(node->IsAttrNode())
+                    {
+                        attr_node_map_[make_pair(parent_cnid, nameid)] = cnid;
+                    }
+                }
+            }
             iter = current_tree_.find(cnid);
         }
         RecordNode &node = (*iter).second;
@@ -743,39 +773,134 @@ void ThreadStore::MarkNodeDirty(RecordNode *node)
                 node->GetTempValues()[i] = node->GetAllValues()[i];
         
         MarkNodeDirty(GetNodeFromID(node->GetParentNodeID()));
+        
+        if(gLeafNodeAccumulate && node->IsAttrNode())
+        {
+            RecordNode *pnode = GetNodeFromID(node->GetParentNodeID());
+            if(!pnode) return;
+            RecordNode *p_pnode = GetNodeFromID(pnode->GetParentNodeID());
+            if(!p_pnode) return;
+            MarkNodeDirty(GetAttrNode(p_pnode->GetNodeID(), node->GetNameID()));
+        }
     }
+}
+
+RecordNode* ThreadStore::GetAttrNode(NodeID cnid, NameID attr_name, bool auto_add)
+{
+    map<pair<NodeID, NameID>, NodeID>::iterator it = attr_node_map_.find(make_pair(cnid, attr_name));
+    if(it == attr_node_map_.end())
+    {
+        NodeID new_node_id = NewAttrNodeID();
+        attr_node_map_[make_pair(cnid, attr_name)] = new_node_id;
+        
+        // add attr node
+        RecordNode *node = AddCurrentNode(new_node_id, cnid, attr_name, true);
+        ds_->TouchGNID(this, node);
+        if(RecordNode *parent = GetNodeFromID(cnid))
+            parent->AddChildID(new_node_id);
+        return node;
+    }
+    return GetNodeFromID((*it).second);
+}
+
+NodeID ThreadStore::GetAttrNodeID(NodeID cnid, NameID attr_name, bool auto_add)
+{
+    RecordNode *node = GetAttrNode(cnid, attr_name, auto_add);
+    if(node)
+        return node->GetNodeID();
+    else
+        return 0;
+}
+
+NodeID ThreadStore::NewAttrNodeID()
+{
+    return current_attr_node_id_index_++;
+}
+
+void ThreadStore::AddTempToChildren(RecordNodeBasic *tss_node, RecordNode* dest_node, RecordNode* src_node)
+{
+    cout << "Temp diff:" << src_node->GetTempValues()[0] << endl;
+    cout << "Start val 0:" << dest_node->GetTempValues()[0] << endl;
+    for(int i = 0; i < ds_->GetNumProfileValues(); i++)
+    {
+        if(!ds_->GetRecordMetadata(i).StaticValueFlag)
+        {
+            if(!dest_node->GetChildrenValues().empty())
+                dest_node->GetChildrenValues()[i] += src_node->GetTempValues()[i];
+            tss_node->GetChildrenValues()[i] += src_node->GetTempValues()[i];
+            if(!ds_->GetRecordMetadata(i).AccumulatedValueFlag)
+            {
+                dest_node->GetTempValues()[i] += src_node->GetTempValues()[i];
+                cout << "Acc" << endl;
+            }
+        }
+    }
+    cout << "End val 0:" << dest_node->GetTempValues()[0] << endl;
 }
 
 bool ThreadStore::ClearDirtyNode(RecordNode *node, TimeSliceStore *tss)
 {
     if(!node || !node->IsDirty())
         return false;
-
+    
+    cout << "Clear Dirty:" << node->GetNodeID() << (node->IsAttrNode() ? "(ATTR)" : "") << endl;
+    
     RecordNodeBasic *tss_node = tss->GetNodeFromID(node->GetNodeID());
     assert(tss_node);
 
-    for(RecordNode::children_iterator it = node->children_begin(); it != node->children_end(); it++)
+    bool is_attr = node->IsAttrNode();
+    
+    if(is_attr)
     {
-        RecordNode *child = GetNodeFromID(*it);
-        if(!ClearDirtyNode(child, tss))
-            continue;
-        
-        for(int i = 0; i < ds_->GetNumProfileValues(); i++)
+        RecordNode *pnode = GetNodeFromID(node->GetParentNodeID());
+        for(RecordNode::children_iterator it = pnode->children_begin(); it != pnode->children_end(); it++)
         {
-            if(!ds_->GetRecordMetadata(i).StaticValueFlag)
+            RecordNode *child = GetNodeFromID(*it);
+            if(child->IsAttrNode())
+                continue;
+            
+            map<pair<NodeID, NameID>, NodeID>::iterator it = attr_node_map_.find(make_pair(child->GetNodeID(), node->GetNameID()));
+            if(it == attr_node_map_.end())
             {
-                if(!node->GetChildrenValues().empty())
-                    node->GetChildrenValues()[i] += child->GetTempValues()[i];
-                tss_node->GetChildrenValues()[i] += child->GetTempValues()[i];
-                if(!ds_->GetRecordMetadata(i).AccumulatedValueFlag)
-                {
-                    node->GetTempValues()[i] += child->GetTempValues()[i];
-                }
+                continue;
+            }
+            
+            cout << "add ATTR: " <<  node->GetNodeID() << " from " << (*it).second << endl;
+            
+            RecordNode *child_attr = GetNodeFromID((*it).second);
+            AddTempToChildren(tss_node, node, child_attr);
+            cout << "added children value: " <<  node->GetChildrenValues()[0] << endl;
+            cout << "added temp value: " <<  node->GetTempValues()[0] << endl;
+        }
+        
+    }
+    else
+    {
+        vector<RecordNode *> attr_nodes;
+        for(RecordNode::children_iterator it = node->children_begin(); it != node->children_end(); it++)
+        {
+            RecordNode *child = GetNodeFromID(*it);
+            if(child->IsAttrNode())
+            {
+                attr_nodes.push_back(child);
+            }
+            else
+            {
+                if(!ClearDirtyNode(child, tss))
+                    continue;
+                AddTempToChildren(tss_node, node, child);
             }
         }
-
+        for(vector<RecordNode *>::iterator itc = attr_nodes.begin(); itc != attr_nodes.end(); itc++)
+        {
+            if(*itc && (*itc)->IsDirty())
+            {
+                AddTempToChildren(tss_node, node, *itc);
+                ClearDirtyNode(*itc, tss);
+            }
+        }
+        
     }
-    
     for(int i = 0; i < ds_->GetNumProfileValues(); i++)
     {
         assert(tss_node->GetAllValues()[i] == 0);
@@ -1155,12 +1280,10 @@ void GlobalThreadStore::Integrate()
                         dest_parent_id = GNIDToSeq(src_current_parent->GetGNID());
 
                     dest_current = AddCurrentNode(dest_node_id, dest_parent_id, dest_node_id);
-                    assert(dest_current->GetNodeID() < 1000000);
                     dest_current->SetGNID(src_current->GetGNID());
                     this->GetDataStore()->SetNameID(dest_node_id, src_current->GetNameString());
                 }
                 RecordNodeBasic *dest = dest_tss->GetNodeFromID(dest_node_id, true);
-                assert(dest_current->GetNodeID() < 1000000);
                 
                 for(int i = 0; i < ds_->GetNumProfileValues(); i++)
                 {

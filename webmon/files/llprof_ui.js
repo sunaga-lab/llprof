@@ -212,12 +212,24 @@ function update_ui_data(data)
     {
         g_target_cct = {};
     }
+
     g_metadata = [];
+    $("#field_index_select").html("");
     for(var i = 0; i < data.numrecords; i++)
     {
-        g_metadata[i] = data.metadata[i];
+        var md = data.metadata[i];
+        g_metadata[i] = md;
+        $("#field_index_select").append("<option value='"+i+"'"+ (g_target_pv_index==i ? " selected='selected'": "") +">" + md.field_name + " (" + md.unit + ")</option>");
     }
     
+    $("#field_index_select").change(
+        function(e){
+            g_target_pv_index = parseInt($("#field_index_select").val());
+        }
+    );
+    
+    
+
 
     var timecaption_updated = false;
     for(var i = 0; i < data.threads.length; i++)

@@ -4,11 +4,30 @@
 #include "code.h"
 #include "object.h"
 #include <iostream>
+#include <algorithm>
 #include <string>
+#include <dlfcn.h>
 using namespace std;
 
 #include "llprof.h"
 
+typedef void (*TPyObjectHookFunc)(PyTypeObject *tp, size_t size, int flag);
+
+void c_icl_child(char *s, int idx, int val);
+
+
+void G_PyObjectHookFunc_Debug(PyTypeObject *tp, size_t size, int flag)
+{
+    // cout << "tp:" << tp->tp_name << " size=" << size << " fl:" << flag << endl;
+    
+    int l = std::min(strlen(tp->tp_name), (size_t)250);
+    char buf[256];
+    buf[0] = '#';
+    memcpy(buf+1, tp->tp_name, l);
+    buf[1+l] = 0;
+    
+    c_icl_child(buf, 2, size);
+}
 
 pthread_key_t g_thread_flag_key;
 
@@ -78,6 +97,25 @@ static PyObject * pyllprof_icl(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+void c_icl_child(char *s, int idx, int val)
+{
+    llprof_call_handler(HashStr(s), s);
+    profile_value_t *pval = llprof_get_profile_value_ptr();
+    pval[idx] += val;
+    llprof_return_handler();
+}
+
+
+static PyObject * pyllprof_icl_child(PyObject *self, PyObject *args)
+{
+    int ok;
+    char *s;
+    int idx, val;
+    ok = PyArg_ParseTuple(args, "sii", &s, &idx, &val);
+
+    c_icl_child(s, idx, val);
+    Py_RETURN_NONE;
+}
 
 int pyllprof_tracefunc(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg)
 {
@@ -147,6 +185,7 @@ static PyMethodDef pyllprof_methods[] = {
     {"begin_profile", pyllprof_begin_profile, METH_VARARGS, "Begin profile"},
     {"end_profile", pyllprof_end_profile, METH_VARARGS, "End profile"},
     {"icl", pyllprof_icl, METH_VARARGS, "Increment Value"},
+    {"icl_child", pyllprof_icl_child, METH_VARARGS, "Increment child value"},
     {NULL, NULL}
 };
 
@@ -189,6 +228,12 @@ initpyllprof(void)
         pyllprof_c_begin_profile("Root");
     }
     
+    void* handle_main = dlopen(NULL, RTLD_LAZY);
+    void (*sethook_func)(TPyObjectHookFunc)
+                        = (void (*)(TPyObjectHookFunc))dlsym(handle_main, "PyObjectHookFunc_Set");
+    if(sethook_func)
+        (*sethook_func)(G_PyObjectHookFunc_Debug);
+
 #if PY_MAJOR_VERSION >= 3
     return module;
 #endif

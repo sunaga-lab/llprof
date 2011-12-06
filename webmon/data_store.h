@@ -185,6 +185,11 @@ public:
     void SetNameID(NameID id){ node_name_ = id; }
     
     string GetNameString();
+    bool IsAttrNode()
+    {
+        string name = GetNameString();
+        return !name.empty() && name[0] == '#';
+    }
     
     void SetRunning(bool f){running_ = f;}
     bool IsRunning() const {return running_;}
@@ -335,6 +340,13 @@ protected:
     NodeID running_node_;
     ThreadID thread_id_;
 
+    // for attribute nodes
+    map<NodeID, NodeID> attr_node_id_alt_;
+    map<pair<NodeID, NameID>, NodeID> attr_node_map_;
+
+    NodeID current_attr_node_id_index_;
+    NodeID NewAttrNodeID();
+    void AddTempToChildren(RecordNodeBasic *tss_node, RecordNode* dest_node, RecordNode* src_node);
 
 public:
     ThreadStore(DataStore *ds);
@@ -383,7 +395,10 @@ public:
     void CheckAllTimeSlice();
 
     RecordNode* AddCurrentNode(NodeID cnid, NodeID parent_cnid, NameID name_id, bool stripable = false);
-
+    
+    RecordNode* GetAttrNode(NodeID cnid, NameID attr_name, bool auto_add = true);
+    NodeID GetAttrNodeID(NodeID cnid, NameID attr_name, bool auto_add = true);
+    
 };
 
 
