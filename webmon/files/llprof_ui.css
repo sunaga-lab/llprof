@@ -83,8 +83,11 @@ td{
 }
 
 .nodelabel{
-    width: 500px;
+    width: 800px;
+    height: 16px;
+    font-size: 12px;
     cursor: pointer;
+    overflow: hidden;
 }
 .nodelabel_hover
 {

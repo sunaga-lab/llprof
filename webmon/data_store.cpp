@@ -819,8 +819,6 @@ NodeID ThreadStore::NewAttrNodeID()
 
 void ThreadStore::AddTempToChildren(RecordNodeBasic *tss_node, RecordNode* dest_node, RecordNode* src_node)
 {
-    cout << "Temp diff:" << src_node->GetTempValues()[0] << endl;
-    cout << "Start val 0:" << dest_node->GetTempValues()[0] << endl;
     for(int i = 0; i < ds_->GetNumProfileValues(); i++)
     {
         if(!ds_->GetRecordMetadata(i).StaticValueFlag)
@@ -831,20 +829,16 @@ void ThreadStore::AddTempToChildren(RecordNodeBasic *tss_node, RecordNode* dest_
             if(!ds_->GetRecordMetadata(i).AccumulatedValueFlag)
             {
                 dest_node->GetTempValues()[i] += src_node->GetTempValues()[i];
-                cout << "Acc" << endl;
             }
         }
     }
-    cout << "End val 0:" << dest_node->GetTempValues()[0] << endl;
 }
 
 bool ThreadStore::ClearDirtyNode(RecordNode *node, TimeSliceStore *tss)
 {
     if(!node || !node->IsDirty())
         return false;
-    
-    cout << "Clear Dirty:" << node->GetNodeID() << (node->IsAttrNode() ? "(ATTR)" : "") << endl;
-    
+      
     RecordNodeBasic *tss_node = tss->GetNodeFromID(node->GetNodeID());
     assert(tss_node);
 
@@ -865,12 +859,9 @@ bool ThreadStore::ClearDirtyNode(RecordNode *node, TimeSliceStore *tss)
                 continue;
             }
             
-            cout << "add ATTR: " <<  node->GetNodeID() << " from " << (*it).second << endl;
             
             RecordNode *child_attr = GetNodeFromID((*it).second);
             AddTempToChildren(tss_node, node, child_attr);
-            cout << "added children value: " <<  node->GetChildrenValues()[0] << endl;
-            cout << "added temp value: " <<  node->GetTempValues()[0] << endl;
         }
         
     }
@@ -997,6 +988,13 @@ void InitDataStore()
     else
     {
         gGlobalDataStore = NULL;
+    }
+    
+    
+    gLeafNodeAccumulate = false;
+    if(getenv("WEBMON_ATTR") && string(getenv("WEBMON_ATTR")) != "0")
+    {
+        gLeafNodeAccumulate = true;
     }
 
     pthread_create(&g_datastore_server_thread, NULL, DataStoreAcceptThreadMain, NULL);

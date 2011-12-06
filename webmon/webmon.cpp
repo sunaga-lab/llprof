@@ -9,6 +9,21 @@
 using namespace std;
 using namespace llprof;
 
+
+void print_usage()
+{
+    cout <<
+        "Usage: webmon [--help]\n"
+        "\n"
+        "Environment Variable:\n"
+        "    WEBMON_INTERVAL\n"
+        "    WEBMON_SINGLE\n"
+        "    WEBMON_ATTR\n"
+    ;
+    
+    
+}
+
 int main()
 {
     InitSocketSubSystem();
@@ -17,6 +32,6 @@ int main()
     cout << "Webserver start." << endl;
     
     while(true)
-        sleep(10);
+        sleep(100);
 }
 

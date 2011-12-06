@@ -93,7 +93,8 @@ add_panel("cct",{
             sval = get_profile_value_all(thread, node, g_target_pv_index);
         node_elem.children(".nodelabel").html(
             "<img src='/files/"+(node.running?"running":"normal")+".png' />"
-             + node.id + ":" + html_esc(node.name) + " " + sval + "(cc:" + node.cc + ")");
+               + sval + " " + html_esc(node.name) + " (id="+node.id+" c=" + node.cc + ")");
+        //     + (node.id < 10000 ? (node.id + ":"): "") + html_esc(node.name) + " " + sval + "(cc:" + node.cc + ")");
         
         // node_elem.children(".nodelabel").html("Node:" + html_esc(node.name) + " v: " + node.all + ";  " + node.cld);
     },
