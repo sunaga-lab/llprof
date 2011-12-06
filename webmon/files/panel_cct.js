@@ -5,10 +5,17 @@ add_panel("cct",{
     {
         if(!this.open_nodes)
             this.open_nodes = {};
+        this.attr_nodes = {};
+        this.attr_node_parents = {};
+        this.selected_node = false;
+        this.selected_thread = false;
     },
     tree_reload: function()
     {
-        $("#mainpanel").html("<div id='cct_outer'><div id='cct_inner'></div></div>");
+        $("#mainpanel").html(
+            "<div id='cct_outer'><div id='cct_inner'></div></div>" +
+            "<div id='nodeinfo_outer' style='overflow: scroll;'><div id='nodeinfo_inner'></div></div>"
+        );
         this.cct_dict = {};
         for(var thread_id in g_target_cct)
         {
@@ -101,9 +108,13 @@ add_panel("cct",{
 
     update_size: function()
     {
+        var NODEINFO_SIZE = 200;
         $("#cct_outer")
             .width($("#mainpanel").width()-4)
-            .height($("#mainpanel").height()-4);
+            .height($("#mainpanel").height()-4 - NODEINFO_SIZE);
+        $("#nodeinfo_outer")
+            .width($("#mainpanel").width()-4)
+            .height(NODEINFO_SIZE);
     },
 
     update: function(updated)
@@ -115,12 +126,34 @@ add_panel("cct",{
             for(var j = 0; j < updated[thread_id].nodes.length; j++)
             {
                 var node = updated[thread_id].nodes[j];
+                var cct_node = g_target_cct[thread_id].nodes[node.id];
+                if(cct_node.name.charAt(0) == "#")
+                    continue;
                 var node_elem = Panels.cct.get_node_elem(thread_id, node.id, true, node.pid);
                 Panels.cct.update_label(node_elem);
-
             }
         }
+        if(this.selected_node)
+        {
+            var selthread = g_target_cct[this.selected_thread];
+            var selnode = selthread.nodes[this.selected_node];
+            var thtml = "ID = " + this.selected_node + ":" + selnode.name + "<table>";
+            thtml += "<table><tr><th>Name</th><th>All</th><th>Self</th>";
+            for(var id in selnode.cid)
+            {
+                var cnode = g_target_cct[thread_id].nodes[id];
+                if(cnode.name.charAt(0) != "#")
+                    continue;
+                
+                thtml += "<tr><td>" + cnode.name
+                 + "</td><td>" + get_profile_value_all(selthread, cnode, g_target_pv_index)
+                 + "</td><td>" + get_profile_value_self(selthread, cnode, g_target_pv_index)
+                "</td></tr>";
 
+            }
+            thtml += "</table>";
+            $('#nodeinfo_inner').html(thtml);
+        }
     },
     
     add_node: function(parent_elem, thread_id, node_id){
@@ -163,6 +196,8 @@ add_panel("cct",{
     
     open_node_elem: function(elem)
     {
+        this.selected_node = elem.attr("nodeid");
+        this.selected_thread = elem.attr("threadid");
         if(elem.children(".children").length != 0)
         {
             delete this.open_nodes[elem.attr("nodeid")];
@@ -180,6 +215,9 @@ add_panel("cct",{
         
         for(var id in node.cid)
         {
+            var cnode = g_target_cct[thread_id].nodes[id];
+            if(cnode.name.charAt(0) == "#")
+                continue;
             var node_elem = Panels.cct.add_node(elem, thread_id, id);
         }
     },
