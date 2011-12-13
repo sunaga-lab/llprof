@@ -2,8 +2,6 @@
 #define RECORD_TYPE_H
 
 
-const int NUM_RECORDS = 3;
-
 
 inline void llprof_rtype_init(profile_value_t *value)
 {
@@ -19,20 +17,6 @@ inline void llprof_rtype_metainfo(rtype_metainfo_t *metainfo)
     metainfo->add(2, "memory", "byte", "");
 }
 
-inline void llprof_rtype_start_node(profile_value_t *value)
-{
-    value[1] = get_time_now_nsec();
-}
-
-inline void llprof_rtype_end_node(const profile_value_t *start_value, profile_value_t *value)
-{
-    value[0] += get_time_now_nsec() - start_value[1];
-}
-
-inline void llprof_rtype_stackinfo_nowval(profile_value_t *value)
-{
-    llprof_rtype_start_node(value);
-}
 
 
 #endif

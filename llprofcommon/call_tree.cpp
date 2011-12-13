@@ -21,7 +21,8 @@
 #include "call_tree.h"
 #include "class_table.h"
 
-#include "record_type.h"
+#include "data_struct.h"
+
 
 using namespace std;
 
@@ -32,7 +33,15 @@ using namespace std;
 int gDefaultNodeInfoTableSize = 1024;
 int gDefaultSerializedNodeInfoTableSize = 1024;
 
-
+struct pvtype_t
+{
+    string record_type_id;
+    string record_type_name;
+    pv_counter_function_t counter_func;
+    int record_index;
+};
+vector<pvtype_t> g_records;
+vector<int> g_active_records;
 
 static const char * (*g_name_func)(nameid_t, void *);
 void llprof_set_name_func(const char * cb(nameid_t, void *))
@@ -40,18 +49,9 @@ void llprof_set_name_func(const char * cb(nameid_t, void *))
     g_name_func = cb;
 }
 
-#define NOW_TIME     ((*g_gettime_func)())
-
 const char *llprof_call_name_func(nameid_t id, void *p)
 {
     return (*g_name_func)(id, p);
-}
-
-
-static profile_value_t (*g_gettime_func)();
-void llprof_set_time_func(profile_value_t (*cb)())
-{
-    g_gettime_func = cb;
 }
 
 
@@ -63,8 +63,8 @@ struct MethodNodeInfo
     
     nameid_t nameid;
 	children_t *children;
-    profile_value_t start_value[NUM_RECORDS];
 	unsigned int parent_node_id;
+    profile_value_t start_value[]; // 
 };
 
 struct MethodNodeSerializedInfo
@@ -72,9 +72,8 @@ struct MethodNodeSerializedInfo
     nameid_t nameid;
     unsigned int call_node_id;
 	unsigned int parent_node_id;
-    profile_value_t profile_value[NUM_RECORDS];
-	unsigned long long int call_count;
-
+ 	unsigned long long int call_count;
+    profile_value_t profile_value[]; // [NUM_RECORDS];
 };
 
 
@@ -97,7 +96,7 @@ void CallTree_GetSlide(slide_record_t **ret, int *nfield)
         ADD_SLIDE(call_node_id, "pdata.call_node_id")
         ADD_SLIDE(parent_node_id, "pdata.parent_node_id")
         slides[slide_idx].field_name = "pdata.record_size";
-        slides[slide_idx].slide = sizeof(test);
+        slides[slide_idx].slide = sizeof(test) + (g_active_records.size() * sizeof(profile_value_t));
         slide_idx++;
     }
 
@@ -106,35 +105,153 @@ void CallTree_GetSlide(slide_record_t **ret, int *nfield)
 }
 
 
+
+
+
+
+
+
+int llprof_add_counter_pv(const char *record_id, const char *record_name, pv_counter_function_t func)
+{
+    int i = g_records.size();
+    g_records.resize(i + 1);
+    g_records[i].record_type_id = record_id;
+    g_records[i].record_type_name = record_name;
+    g_records[i].counter_func = func;
+    g_records[i].record_index = -1;
+    return i;
+}
+
+int llprof_add_event_pv(const char *record_id, const char *record_name)
+{
+    int i = g_records.size();
+    g_records.resize(i + 1);
+    g_records[i].record_type_id = record_id;
+    g_records[i].record_type_name = record_name;
+    g_records[i].counter_func = NULL;
+    g_records[i].record_index = -1;
+    return i;
+}
+
 string llprof_get_record_info()
 {
-    rtype_metainfo_t metainfo(NUM_RECORDS);
-    llprof_rtype_metainfo(&metainfo);
-    
     string result;
     char buf[64];
-    sprintf(buf, "%d", NUM_RECORDS);
+    sprintf(buf, "%d", (int)g_active_records.size());
     result = string(buf) + "\n";
-    for(int i = 0; i < NUM_RECORDS; i++)
+    for(int i = 0; i < g_active_records.size(); i++)
     {
+        string name = g_records[g_active_records[i]].record_type_name;
+        string flag;
+        if(i > 0 &&  g_active_records[i-1] == g_active_records[i])
+        {
+            flag = "S";
+            name += "(sv)";
+        }
+        else if(g_records[g_active_records[i]].counter_func)
+        {
+            flag = "A";
+        }
         sprintf(buf, "%d", i);
-        result += string(buf) + " " + metainfo.records[i] + "\n";
+        result += string(buf) + " " + name + " U f" + flag + "\n";
     }
     return result;
 }
 
 
+pvt_index_t llprof_get_pvt_index_from_name(const char *pvt_id)
+{
+    for(int i = 0; i < g_records.size(); i++)
+    {
+        if(g_records[i].record_type_id == pvt_id)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
 
+bool llprof_is_pvt_enabled(pvt_index_t pvt)
+{
+    return g_records[pvt].record_index != -1;
+}
+
+int llprof_add_active_record(const char *pvt_id)
+{
+    int i = llprof_get_pvt_index_from_name(pvt_id);
+    if(i == -1)
+        return -1;
+    
+    if(g_records[i].record_index != -1)
+    {
+        cout << "Record Type ID duplicated: " << pvt_id << endl;
+        return -1;
+    }
+    if(g_records[i].counter_func)
+    {
+        g_active_records.push_back(i);
+        g_active_records.push_back(i);
+        return g_active_records.size() - 2;
+    }
+    else
+    {
+        g_active_records.push_back(i);
+        return g_active_records.size() - 1;
+    }
+}
+
+void llprof_set_record_string(const char *record_string)
+{
+    if(!record_string)
+        return;
+    int n;
+    string rstr(record_string);
+    string delim = " ";
+	for(int i = 0; i <= rstr.length(); i = n+1 )
+    {
+		n = rstr.find_first_of(delim, i);
+		if(n == string::npos)
+            n = rstr.length();
+		
+        llprof_add_active_record(rstr.substr(i, n-i).c_str());
+	}
+}
+
+inline void llprof_rtype_start_node(profile_value_t *value)
+{
+    for(int i = 0; i < g_active_records.size(); i++)
+    {
+        if(g_records[g_active_records[i]].counter_func)
+        {
+            ++i;
+            value[i] = (*g_records[g_active_records[i]].counter_func)();
+        }
+        ++i;
+    }
+}
+
+inline void llprof_rtype_end_node(const profile_value_t *start_value, profile_value_t *value)
+{
+    for(int i = 0; i < g_active_records.size(); i++)
+    {
+        if(g_records[g_active_records[i]].counter_func)
+        {
+            value[0] += (*g_records[g_active_records[i]].counter_func)() - start_value[i+1];
+            ++i;
+        }
+        ++i;
+    }
+}
 
 
 struct ThreadInfo
 {
     unsigned long long int ThreadID;
 
-    vector<MethodNodeInfo> NodeInfoArray;
+    free_stride_vector<MethodNodeInfo> NodeInfoArray;
 
 
-    vector<MethodNodeSerializedInfo>* SerializedNodeInfoArray;
+    free_stride_vector<MethodNodeSerializedInfo>* SerializedNodeInfoArray;
 
 
     unsigned int CurrentCallNodeID;
@@ -147,7 +264,7 @@ struct ThreadInfo
     
     ThreadInfo *next;
 
-    profile_value_t NowInfo[NUM_RECORDS+1];
+    profile_value_t *NowInfo;
 
     ThreadInfo(unsigned long long thread_id)
     {
@@ -156,12 +273,13 @@ struct ThreadInfo
         pthread_mutex_init(&DataMutex, NULL);
         stop = 0;
         
-        SerializedNodeInfoArray = new vector<MethodNodeSerializedInfo>();
-
+        SerializedNodeInfoArray = new free_stride_vector<MethodNodeSerializedInfo>();
+        SerializedNodeInfoArray->set_extra_stride(g_active_records.size() * sizeof(profile_value_t));
+        NowInfo = new profile_value_t[g_active_records.size()+1];
 #ifdef LLPROF_DEBUG
         cout << "[NewThread]"  << endl << "  pNodes = " << SerializedNodeInfoArray << endl;
 #endif
-
+        NodeInfoArray.set_extra_stride(g_active_records.size() * sizeof(profile_value_t));
         NodeInfoArray.reserve(gDefaultNodeInfoTableSize);
         SerializedNodeInfoArray->reserve(gDefaultSerializedNodeInfoTableSize);
         
@@ -218,7 +336,7 @@ ThreadInfo *get_current_thread()
 
 
 // 送信用バッファ
-vector<MethodNodeSerializedInfo>* gBackBuffer_SerializedNodeInfoArray;
+free_stride_vector<MethodNodeSerializedInfo>* gBackBuffer_SerializedNodeInfoArray;
 
 
 
@@ -229,7 +347,7 @@ static MethodNodeInfo *GetNodeInfo(unsigned int call_node_id);
 
 
 template <class T>
-T *new_tail_elem(vector<T> &arr)
+typename T::value_type *new_tail_elem(T &arr)
 {
     arr.resize(arr.size() + 1);
     return &arr[arr.size() - 1];
@@ -260,7 +378,7 @@ void AddActualRecord(unsigned int cnid)
 	sinfo->call_node_id = cnid;
 	sinfo->parent_node_id = call_node->parent_node_id;
 	sinfo->nameid = call_node->nameid;
-    llprof_rtype_init(sinfo->profile_value);
+    memset(sinfo->profile_value, 0, g_active_records.size() * sizeof(profile_value_t));
     sinfo->call_count = 0;
 
 
@@ -362,7 +480,7 @@ void llprof_call_handler(nameid_t nameid, void *name_info)
 
     sinfo->call_count++;
     llprof_rtype_start_node(sinfo->profile_value);
-    memcpy(ninfo->start_value, sinfo->profile_value, NUM_RECORDS * 8);
+    memcpy(ninfo->start_value, sinfo->profile_value, g_active_records.size() * 8);
     
 
     
@@ -371,14 +489,22 @@ void llprof_call_handler(nameid_t nameid, void *name_info)
 	ti->stop = 0;
 }
 
-profile_value_t* llprof_get_profile_value_ptr()
-{
-    ThreadInfo* ti = CURRENT_THREAD;
-    MethodNodeSerializedInfo *sinfo;
-    MethodNodeInfo *ninfo;
-    get_current_node_info_pair(ti, ninfo, sinfo);
 
-    return sinfo->profile_value;
+void llprof_icl_profile_value(int record_type_index, profile_value_t value)
+{
+#ifdef LLPROF_DEBUG
+    assert(record_type_index < g_records.size());
+#endif
+    pvtype_t &pvr = g_records[record_type_index];
+    
+    if(pvr.record_index != -1)
+    {
+        ThreadInfo* ti = CURRENT_THREAD;
+        MethodNodeSerializedInfo *sinfo;
+        MethodNodeInfo *ninfo;
+        get_current_node_info_pair(ti, ninfo, sinfo);
+        sinfo->profile_value[pvr.record_index] += value;
+    }
 }
 
 
@@ -421,63 +547,6 @@ typedef struct
 {
 	int indent;
 } print_tree_prm_t;
-
-
-/*
-void print_tree_st(MethodNodeInfo *key, unsigned int id, st_data_t data)
-{
-	print_tree_prm_t *prm = (print_tree_prm_t *)data;
-	print_tree(id, prm->indent);
-}
-void print_tree(unsigned int id, int indent)
-{
-    assert(0);
-    ThreadInfo* ti = CURRENT_THREAD;
-    MethodNodeInfo *info = &ti->NodeInfoArray[id];
-	MethodNodeSerializedInfo *sinfo = &(*ti->SerializedNodeInfoArray)[id];
-
-	int i = 0;
-	for(; i < indent; i++)
-	{
-		cout << " ";
-	}
-	cout << info->mid_str << "(" << sinfo->call_count << ")"<< endl;
-	
-	print_tree_prm_t prm;
-	prm.indent = indent + 2;
-	st_foreach(info->children->tbl, (int (*)(...))print_tree_st, (st_data_t)&prm);
-}
-
-
-void print_table()
-{
-    assert(0);
-    ThreadInfo *ti = CURRENT_THREAD;
-    printf("%8s %16s %24s %8s %12s %16s %16s\n", "id", "class", "name", "p-id", "count", "all-t", "self-t");
-	int i = 1;
-	for(i = 1; i < ti->NodeInfoArray.size(); i++)
-	{
-		MethodNodeInfo *info = GetNodeInfo(i);
-		MethodNodeSerializedInfo *sinfo = GetSerializedNodeInfoNoAdd(i);
-        if(!sinfo)
-            continue;
-		printf(
-            "%8d %16lld %24s %8d %12lld %16lld %16lld\n",
-            i,
-            (unsigned long long int)info->klass,
-            info->mid_str,
-            sinfo->parent_node_id,
-            sinfo->call_count,
-            sinfo->all_time,
-            sinfo->all_time - sinfo->children_time
-        );
-
-	}
-}
-
-*/
-
-
 
 
 void BufferIteration_Initialize(ThreadIterator *iter)
@@ -523,8 +592,8 @@ void CallTree_GetSerializedBuffer(ThreadInfo *thread, void **buf, unsigned int *
     thread->GenerationNumber++;
     thread->SerializedNodeInfoArray->resize(0);
 
-	*buf = &(*gBackBuffer_SerializedNodeInfoArray)[0];
-    *size = gBackBuffer_SerializedNodeInfoArray->size() * sizeof(MethodNodeSerializedInfo);
+	*buf = gBackBuffer_SerializedNodeInfoArray->start_pointer();
+    *size = gBackBuffer_SerializedNodeInfoArray->buffer_size();
     
     thread->NowInfo[0] = thread->CurrentCallNodeID;
     
@@ -535,9 +604,9 @@ void CallTree_GetSerializedBuffer(ThreadInfo *thread, void **buf, unsigned int *
 
 void CallTree_GetNowInfo(ThreadInfo *thread, void **buf, unsigned int *size)
 {
-    llprof_rtype_stackinfo_nowval(thread->NowInfo+1);
+    llprof_rtype_start_node(thread->NowInfo+1);
  	*buf = thread->NowInfo; // [0]には現在のCNIDが入っている
-	*size = (NUM_RECORDS+1) * sizeof(profile_value_t);
+	*size = (g_active_records.size()+1) * sizeof(profile_value_t);
 }
 
 void BufferIteration_GetBuffer(ThreadIterator *iter, void **buf, unsigned int *size)
@@ -586,7 +655,10 @@ void llprof_calltree_init()
     pthread_mutex_init(&gThreadDataMutex, NULL);
     pthread_key_create(&gCurrentThreadKey, NULL);
 
-    gBackBuffer_SerializedNodeInfoArray = new vector<MethodNodeSerializedInfo>();
+
+    
+    gBackBuffer_SerializedNodeInfoArray = new free_stride_vector<MethodNodeSerializedInfo>();
+    gBackBuffer_SerializedNodeInfoArray->set_extra_stride(g_active_records.size() * sizeof(profile_value_t));
     get_current_thread();
 }
 

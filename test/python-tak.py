@@ -25,7 +25,7 @@ def main():
         t = timeit.Timer(stmt = f)
         print("Time", i, "=", t.timeit(number = 1))
 
-mode = "no"
+mode = "ll"
 if mode == "c":
 	import cProfile
 	cProfile.run("main()")

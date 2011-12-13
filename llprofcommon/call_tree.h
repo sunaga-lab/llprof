@@ -36,11 +36,10 @@ int BufferIteration_NextBuffer(ThreadIterator *iter);
 
 
 typedef unsigned long long nameid_t;
+typedef int pvt_index_t;
 
 // Public API
 void llprof_set_name_func(const char * cb(nameid_t, void *data_ptr));
-void llprof_set_time_func(profile_value_t (*cb)());
-
 
 
 
@@ -51,11 +50,20 @@ void llprof_return_handler();
 
 void llprof_calltree_init();
 
-profile_value_t* llprof_get_profile_value_ptr();
+// profile_value_t* llprof_get_profile_value_ptr();
+void llprof_icl_profile_value(pvt_index_t record_type_index, profile_value_t value);
+
 
 std::string llprof_get_record_info();
+int llprof_add_active_record(const char *pvt_id);
 
+typedef profile_value_t (*pv_counter_function_t)();
 
-//
+void llprof_set_record_string(const char *record_string);
+pvt_index_t llprof_add_counter_pv(const char *record_id, const char *record_name, pv_counter_function_t func);
+pvt_index_t llprof_add_event_pv(const char *record_id, const char *record_name);
+
+pvt_index_t llprof_get_pvt_index_from_name(const char *pvt_id);
+bool llprof_is_pvt_enabled(pvt_index_t pvt);
 
 #endif

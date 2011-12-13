@@ -85,14 +85,10 @@ static PyObject * pyllprof_end_profile(PyObject *self, PyObject *args)
 
 static PyObject * pyllprof_icl(PyObject *self, PyObject *args)
 {
-    profile_value_t *pval = llprof_get_profile_value_ptr();
-
-    int ok;
-    int idx;
-    int val;
+    int ok, idx, val;
     ok = PyArg_ParseTuple(args, "ii", &idx, &val);
 
-    pval[idx] += val;
+    llprof_icl_profile_value(idx, val);
     
     Py_RETURN_NONE;
 }
@@ -100,8 +96,7 @@ static PyObject * pyllprof_icl(PyObject *self, PyObject *args)
 void c_icl_child(char *s, int idx, int val)
 {
     llprof_call_handler(HashStr(s), s);
-    profile_value_t *pval = llprof_get_profile_value_ptr();
-    pval[idx] += val;
+    llprof_icl_profile_value(idx, val);
     llprof_return_handler();
 }
 
@@ -116,6 +111,30 @@ static PyObject * pyllprof_icl_child(PyObject *self, PyObject *args)
     c_icl_child(s, idx, val);
     Py_RETURN_NONE;
 }
+
+static PyObject * pyllprof_get_pvt_index_from_name(PyObject *self, PyObject *args)
+{
+    int ok;
+    char *pvt_name;
+    ok = PyArg_ParseTuple(args, "s", &pvt_name);
+    return Py_BuildValue("i", llprof_get_pvt_index_from_name(pvt_name));
+}
+
+static PyObject *pyllprof_is_pvt_enabled(PyObject *self, PyObject *args)
+{
+    int ok;
+    int pvt;
+    ok = PyArg_ParseTuple(args, "i", &pvt);
+    if(llprof_is_pvt_enabled(pvt))
+    {
+        Py_RETURN_TRUE;
+    }
+    else
+    {
+        Py_RETURN_FALSE;
+    }
+}
+
 
 int pyllprof_tracefunc(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg)
 {
@@ -186,6 +205,8 @@ static PyMethodDef pyllprof_methods[] = {
     {"end_profile", pyllprof_end_profile, METH_VARARGS, "End profile"},
     {"icl", pyllprof_icl, METH_VARARGS, "Increment Value"},
     {"icl_child", pyllprof_icl_child, METH_VARARGS, "Increment child value"},
+    {"get_pvt_index_from_name", pyllprof_get_pvt_index_from_name, METH_VARARGS, "get_pvt_index_from_name"},
+    {"is_pvt_enabled", pyllprof_is_pvt_enabled, METH_VARARGS, "is_pvt_enabled"},
     {NULL, NULL}
 };
 
@@ -217,8 +238,12 @@ initpyllprof(void)
     PyObject *module = Py_InitModule("pyllprof", pyllprof_methods);
 #endif
 
-    llprof_set_time_func(get_time_now_nsec);
     llprof_set_name_func(python_name_func);
+
+    llprof_add_counter_pv("time", "Time:ns", get_time_now_nsec);
+    llprof_add_event_pv("memory", "Memory:byte");
+
+    llprof_set_record_string(getenv("LLPROF_RECORDS"));
     llprof_init();
     pyllprof_init();
     
