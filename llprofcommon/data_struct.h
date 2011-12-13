@@ -3,8 +3,28 @@
 
 #include <stdlib.h>
 #include <iostream>
+#include <map>
+#include <tr1/unordered_map>
 using namespace std;
 
+
+
+#ifdef USE_UNORDERD_MAP
+    typedef std::tr1::unordered_map<nameid_t, unsigned int> children_t;
+
+    inline children_t *create_children_map()
+    {
+        return new children_t(2);
+    }
+#else
+    typedef std::map<nameid_t, unsigned int> children_t;
+
+    inline children_t *create_children_map()
+    {
+        return new children_t();
+    }
+
+#endif
 
 const int ALLOCATE_FACTOR = 2;
 

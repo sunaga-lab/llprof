@@ -8,7 +8,6 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
-#include <map>
 #include <cstdlib>
 
 #include "platforms.h"
@@ -54,8 +53,6 @@ const char *llprof_call_name_func(nameid_t id, void *p)
     return (*g_name_func)(id, p);
 }
 
-
-typedef map<nameid_t, unsigned int> children_t;
 struct MethodNodeInfo
 {
     unsigned int serialized_node_index;
@@ -444,7 +441,7 @@ unsigned int ThreadInfo::AddCallNode(unsigned int parent_node_id, nameid_t namei
     call_node->serialized_node_index = 0;
     call_node->generation_number = 0;
     call_node->nameid = nameid;
-    call_node->children = new children_t();
+    call_node->children = create_children_map();
     
     GetNameIDTable()->AddCB(nameid, name_info_ptr);
     

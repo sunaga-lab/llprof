@@ -5,7 +5,11 @@ import sys
 import timeit
 
 ntest = 5
-if len(sys.argv) >= 2:
+mode = "ll"
+if len(sys.argv) >= 3:
+    mode = sys.argv[1]
+    ntest = int(sys.argv[2])
+elif len(sys.argv) >= 2:
     ntest = int(sys.argv[1])
     
 
@@ -25,7 +29,6 @@ def main():
         t = timeit.Timer(stmt = f)
         print("Time", i, "=", t.timeit(number = 1))
 
-mode = "ll"
 if mode == "c":
 	import cProfile
 	cProfile.run("main()")

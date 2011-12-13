@@ -15,13 +15,13 @@ module1 = Extension(
     libraries = [
         "rt"
     ],
-    extra_compile_args = ["-g"],
-    extra_link_args = ["-g"],
+    extra_compile_args = ["-O3"],
+    extra_link_args = ["-O3"],
 )
 
 setup (name = 'pyllprof',
        version = '1.0',
-       description = 'This is a demo package',
+       description = 'llprof for Python',
        ext_modules = [module1])
 
 
