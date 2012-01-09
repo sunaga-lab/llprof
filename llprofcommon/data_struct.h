@@ -1,6 +1,7 @@
 #ifndef DATA_STRUCT_H
 #define DATA_STRUCT_H
 
+#include <assert.h>
 #include <stdlib.h>
 #include <iostream>
 #include <map>
