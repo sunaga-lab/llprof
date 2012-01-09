@@ -54,6 +54,8 @@ void Init_rrprof(void)
 {
     llprof_add_counter_pv("time", "Time:ns", get_time_now_nsec);
     llprof_set_name_func(rrprof_name_func);
+
+    llprof_set_record_string(getenv("LLPROF_RECORDS"));
     llprof_init();
     
 	VALUE rrprof_mod = rb_define_module("RRProf");
