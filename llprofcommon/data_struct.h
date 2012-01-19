@@ -8,7 +8,7 @@
 #include <tr1/unordered_map>
 using namespace std;
 
-
+#define USE_UNORDERD_MAP
 
 #ifdef USE_UNORDERD_MAP
     typedef std::tr1::unordered_map<nameid_t, unsigned int> children_t;

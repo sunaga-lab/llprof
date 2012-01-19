@@ -13,5 +13,5 @@ def tak(x, y, z)
 end
 
 i = 0
-2.times { p "Try:", i; i+=1; tak(12,6,0) }
+4.times { p "Try:", i; i+=1; tak(12,6,0) }
 

@@ -354,11 +354,11 @@ typename T::value_type *new_tail_elem(T &arr)
 inline unsigned int GetChildNodeID(ThreadInfo *ti, nameid_t nameid, void *name_data_ptr)
 {
     unsigned int parent_id = ti->CurrentCallNodeID;
-	MethodNodeInfo *node_info = &ti->NodeInfoArray[parent_id];
+    MethodNodeInfo *node_info = &ti->NodeInfoArray[parent_id];
     children_t::iterator iter = node_info->children->find(nameid);
-	if(iter == node_info->children->end())
-		return ti->AddCallNode(parent_id, nameid, name_data_ptr);
-	return (*iter).second;
+    if(iter == node_info->children->end())
+        return ti->AddCallNode(parent_id, nameid, name_data_ptr);
+    return (*iter).second;
 }
 
 
@@ -428,6 +428,7 @@ inline void get_current_node_info_pair(ThreadInfo *ti, MethodNodeInfo *&ninfo, M
     ninfo = &ti->NodeInfoArray[ti->CurrentCallNodeID];
     if(ninfo->generation_number != ti->GenerationNumber)
         AddActualRecord(ti->CurrentCallNodeID);
+
     sinfo = &(*ti->SerializedNodeInfoArray)[ninfo->serialized_node_index];
     pthread_mutex_unlock(&ti->DataMutex);
 }
@@ -461,8 +462,8 @@ void llprof_call_handler(nameid_t nameid, void *name_info)
 {
     ThreadInfo* ti = CURRENT_THREAD;
 
-	assert(ti->stop == 0);
-	ti->stop = 1;
+    assert(ti->stop == 0);
+    ti->stop = 1;
 
     unsigned int before = ti->CurrentCallNodeID;
     ti->CurrentCallNodeID = GetChildNodeID(ti, nameid, name_info);
@@ -474,16 +475,10 @@ void llprof_call_handler(nameid_t nameid, void *name_info)
     MethodNodeSerializedInfo *sinfo;
     MethodNodeInfo *ninfo;
     get_current_node_info_pair(ti, ninfo, sinfo);
-
     sinfo->call_count++;
     llprof_rtype_start_node(sinfo->profile_value);
     memcpy(ninfo->start_value, sinfo->profile_value, g_active_records.size() * 8);
-    
-
-    
-    
-    
-	ti->stop = 0;
+    ti->stop = 0;
 }
 
 
@@ -516,11 +511,10 @@ void llprof_return_handler()
         return;
     }
     
-	assert(ti->stop == 0);
-	ti->stop = 1;
+    assert(ti->stop == 0);
+    ti->stop = 1;
     MethodNodeSerializedInfo *sinfo;
     MethodNodeInfo *ninfo;
-
     get_current_node_info_pair(ti, ninfo, sinfo);
     
     
@@ -530,10 +524,7 @@ void llprof_return_handler()
 #ifdef LLPROF_DEBUG
     assert(ti->CurrentCallNodeID != 0);
 #endif
-
-
-
-	ti->stop = 0;	
+    ti->stop = 0;	
 }
 
 

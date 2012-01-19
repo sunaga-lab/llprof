@@ -42,6 +42,7 @@ void rrprof_calltree_call_hook(rb_event_flag_t event, VALUE data, VALUE self, ID
         rb_frame_method_id_and_class(&ruby_name_info.id, &ruby_name_info.klass);
     nameid_t nameid = nameinfo_to_nameid(ruby_name_info);
     llprof_call_handler(nameid, (void *)&ruby_name_info);
+
 }
 
 void rrprof_calltree_ret_hook(rb_event_flag_t event, VALUE data, VALUE self, ID p_id, VALUE p_klass)
@@ -52,6 +53,7 @@ void rrprof_calltree_ret_hook(rb_event_flag_t event, VALUE data, VALUE self, ID 
 extern "C" 
 void Init_rrprof(void)
 {
+
     llprof_add_counter_pv("time", "Time:ns", get_time_now_nsec);
     llprof_set_name_func(rrprof_name_func);
 

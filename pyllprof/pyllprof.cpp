@@ -56,7 +56,6 @@ void pyllprof_c_begin_profile(char *s)
         PyEval_SetProfile(pyllprof_tracefunc, NULL);
     }
     (*counter)++;
-    
     llprof_call_handler(HashStr(s), s);
 
 }
@@ -241,7 +240,7 @@ initpyllprof(void)
     llprof_set_name_func(python_name_func);
 
     llprof_add_counter_pv("time", "Time:ns", get_time_now_nsec);
-    llprof_add_event_pv("memory", "Memory:byte");
+    // llprof_add_event_pv("memory", "Memory:byte");
 
     llprof_set_record_string(getenv("LLPROF_RECORDS"));
     llprof_init();
@@ -252,13 +251,13 @@ initpyllprof(void)
     {
         pyllprof_c_begin_profile("Root");
     }
-    
+    /*
     void* handle_main = dlopen(NULL, RTLD_LAZY);
     void (*sethook_func)(TPyObjectHookFunc)
                         = (void (*)(TPyObjectHookFunc))dlsym(handle_main, "PyObjectHookFunc_Set");
     if(sethook_func)
         (*sethook_func)(G_PyObjectHookFunc_Debug);
-
+*/
 #if PY_MAJOR_VERSION >= 3
     return module;
 #endif
