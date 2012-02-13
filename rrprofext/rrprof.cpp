@@ -53,16 +53,15 @@ void rrprof_calltree_ret_hook(rb_event_flag_t event, VALUE data, VALUE self, ID 
 extern "C" 
 void Init_rrprof(void)
 {
-
     llprof_add_counter_pv("time", "Time:ns", get_time_now_nsec);
     llprof_set_name_func(rrprof_name_func);
 
     llprof_set_record_string(getenv("LLPROF_RECORDS"));
     llprof_init();
     
-	VALUE rrprof_mod = rb_define_module("RRProf");
+    VALUE rrprof_mod = rb_define_module("RRProf");
 
-	rb_add_event_hook(&rrprof_calltree_call_hook, RUBY_EVENT_CALL | RUBY_EVENT_C_CALL, Qnil);
-	rb_add_event_hook(&rrprof_calltree_ret_hook, RUBY_EVENT_RETURN | RUBY_EVENT_C_RETURN, Qnil);
+    rb_add_event_hook(&rrprof_calltree_call_hook, RUBY_EVENT_CALL | RUBY_EVENT_C_CALL, Qnil);
+    rb_add_event_hook(&rrprof_calltree_ret_hook, RUBY_EVENT_RETURN | RUBY_EVENT_C_RETURN, Qnil);
 }
 

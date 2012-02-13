@@ -15,14 +15,8 @@ using namespace std;
 
 extern "C" int luaopen_llprofpm(lua_State *L);
 
-
-int l_test(lua_State *L)
-{
-    cout << "This is test function" << endl;
-}
-
 static luaL_Reg reg[] = {
-  {"test", l_test},
+#  {"test", l_test},
   {NULL, NULL}
 };
 
@@ -48,15 +42,11 @@ const char *lua_name_func(nameid_t nameid, void *p)
         return "(null)";
     if(p)
         return (char *)p;
-
     return "(invalid)";
 }
 
-
-
 int luaopen_llprofpm(lua_State *L)
 {
-    cout << "LLPROF Start" << endl;
     llprof_set_time_func(get_time_now_nsec);
     llprof_set_name_func(lua_name_func);
     llprof_init();
