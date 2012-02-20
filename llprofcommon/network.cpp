@@ -1,5 +1,6 @@
 
 #include "network.h"
+#include "windows_support.h"
 #include <assert.h>
 #include <string>
 #include <cstdlib>
@@ -65,7 +66,7 @@ int SocketConnectTo(string host, string service)
 			continue;
 		if(connect(sock, res->ai_addr, res->ai_addrlen) != 0)
 		{
-			close(sock);
+			closesocket(sock);
             sock = -1;
 			continue;
 		}

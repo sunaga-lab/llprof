@@ -27,7 +27,7 @@ profile_value_t get_time_now_nsec()
 #endif
 
 volatile profile_value_t gTimerCounter = 0;
-profile_value_t gTimerCounterInterval = 1000;
+profile_value_t gTimerCounterInterval = 1;
 pthread_t gTimerThread;
 
 static void* timer_thread_main(void *p)
@@ -35,7 +35,7 @@ static void* timer_thread_main(void *p)
     for(;;)
     {
         ++gTimerCounter;
-        usleep(gTimerCounterInterval);
+        sleep(gTimerCounterInterval);
     }    
 }
 void start_timer_thread()

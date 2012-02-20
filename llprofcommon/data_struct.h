@@ -1,16 +1,19 @@
 #ifndef DATA_STRUCT_H
 #define DATA_STRUCT_H
 
+// #define USE_UNORDERD_MAP
+
+
 #include <assert.h>
 #include <stdlib.h>
 #include <iostream>
 #include <map>
-#include <tr1/unordered_map>
 using namespace std;
 
-#define USE_UNORDERD_MAP
+#include "windows_support.h"
 
 #ifdef USE_UNORDERD_MAP
+#include <tr1/unordered_map>
     typedef std::tr1::unordered_map<nameid_t, unsigned int> children_t;
 
     inline children_t *create_children_map()
@@ -95,7 +98,7 @@ public:
         return buffer_;
     }
 
-    ssize_t buffer_size()
+    int buffer_size()
     {
         return size_ * stride_;
     }
@@ -105,7 +108,7 @@ public:
         return !buffer_ || size_ == 0;
     }
     
-    ssize_t size()
+    int size()
     {
         return size_;
     }

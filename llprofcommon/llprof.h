@@ -9,10 +9,13 @@
 #include "platforms.h"
 #include "measurement.h"
 
+
 // Profilerの初期化
+
 void llprof_init();
 
 // クライアントモードの設定
+
 void llprof_client(bool enabled);
 
 

@@ -1,12 +1,19 @@
 ﻿/* windows_support.h - WindowsとUNIXの差分を埋めるためのサポート
  */
 
-#ifndef RRPROF_WINDOWS_SUPPORT
-#define RRPROF_WINDOWS_SUPPORT
+#ifndef LLPROF_WINDOWS_SUPPORT
+#define LLPROF_WINDOWS_SUPPORT
+
 #ifdef _WIN32
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <process.h>
+
+
+#define MSG_NOSIGNAL 0
+
+#define socklen_t int
 
 typedef HANDLE pthread_t;
 struct pthread_attr_t{
@@ -40,5 +47,13 @@ int pthread_setspecific(pthread_key_t key, void *pointer);
 
 unsigned int sleep(unsigned int seconds);
 
+
+
+#else /* _WIN32 */
+
+#define closesocket close
+
 #endif
+
+
 #endif

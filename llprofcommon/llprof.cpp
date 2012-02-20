@@ -39,7 +39,8 @@ void llprof_init()
 
 
 
-// クライアントモードの設定
+/* クライアントモードの設定 */
+
 void llprof_client(bool enabled)
 {
     g_client_mode = enabled;

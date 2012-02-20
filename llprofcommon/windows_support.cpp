@@ -1,7 +1,10 @@
 #ifdef _WIN32
 
+#include <iostream>
+
 #include "windows_support.h"
 
+using namespace std;
 
 struct no_return_func_param_t{
     void * (*start_routine)(void *);
