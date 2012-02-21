@@ -493,7 +493,6 @@ public:
     
     int GetNumProfileValues()
     {
-        assert(num_records_ != 0);
         return num_records_;
     }
     

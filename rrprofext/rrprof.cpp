@@ -9,20 +9,39 @@
 #include <sstream>
 using namespace std;
 
+// #define PROFILE_C_CALL
+
 struct ruby_name_info_t{
     VALUE klass;
     ID id;
 };
 
-const char *rrprof_name_func(nameid_t nameid, void *name_info_ptr)
+const int NAMEBUF_SIZE = 64;
+
+const char *rrprof_name_func(nameid_t nameid, void *ptr)
 {
+	ruby_name_info_t *name_info_ptr = (ruby_name_info_t *)ptr;
     if(!name_info_ptr)
         return "(null)";
 
-    stringstream s;
-    s   << rb_class2name(((ruby_name_info_t*)name_info_ptr)->klass)
-        << "::" << rb_id2name(((ruby_name_info_t*)name_info_ptr)->id);
-    return s.str().c_str();
+	if(!name_info_ptr->klass && !name_info_ptr->id)
+        return "(null)";
+
+	//cout << "Get Name: " << nameid << " ptr:" << name_info_ptr << " ID:" << name_info_ptr->id
+	//		<< " KLASS:" << name_info_ptr->klass << endl;
+
+	const char *klass_str = rb_class2name(name_info_ptr->klass);
+	//cout << "klass_str:" << klass_str << endl;
+	const char *id_str = rb_id2name(name_info_ptr->id);
+	//cout << "id_str:" << id_str << endl;
+
+	char *name = new char[NAMEBUF_SIZE];
+	snprintf(
+		name, NAMEBUF_SIZE, "%s::%s", klass_str, id_str
+	);
+
+	// cout << "Got Name: " << name << endl;
+    return name;
 }
 
 inline nameid_t nameinfo_to_nameid(const ruby_name_info_t &nameinfo)
@@ -39,11 +58,17 @@ void rrprof_calltree_call_hook(rb_event_flag_t event, VALUE data, VALUE self, ID
         ruby_name_info.klass = p_klass;
     }
     else
-        rb_frame_method_id_and_class(&ruby_name_info.id, &ruby_name_info.klass);
+	{
+        if(!rb_frame_method_id_and_class(&ruby_name_info.id, &ruby_name_info.klass))
+		{
+			ruby_name_info.id = 0;
+			ruby_name_info.klass = 0;
+		}
+	}
     nameid_t nameid = nameinfo_to_nameid(ruby_name_info);
     llprof_call_handler(nameid, (void *)&ruby_name_info);
-
 }
+
 
 void rrprof_calltree_ret_hook(rb_event_flag_t event, VALUE data, VALUE self, ID p_id, VALUE p_klass)
 {
@@ -61,7 +86,12 @@ void Init_rrprof(void)
     
     VALUE rrprof_mod = rb_define_module("RRProf");
 
+#ifdef PROFILE_C_CALL
     rb_add_event_hook(&rrprof_calltree_call_hook, RUBY_EVENT_CALL | RUBY_EVENT_C_CALL, Qnil);
     rb_add_event_hook(&rrprof_calltree_ret_hook, RUBY_EVENT_RETURN | RUBY_EVENT_C_RETURN, Qnil);
+#else
+    rb_add_event_hook(&rrprof_calltree_call_hook, RUBY_EVENT_CALL, Qnil);
+    rb_add_event_hook(&rrprof_calltree_ret_hook, RUBY_EVENT_RETURN, Qnil);
+#endif
 }
 
